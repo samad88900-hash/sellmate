@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#121514" />
+  <meta name="description" content="SellMate — orders, stock, payments and smart WhatsApp/Instagram replies for small sellers." />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <title>SellMate — Seller Workspace</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Primary navigation">
+      <div class="brand">
+        <div class="brand-mark">SM</div>
+        <div class="brand-copy"><strong>SellMate</strong><span>Seller workspace</span></div>
+      </div>
+      <nav class="side-nav">
+        <button class="nav-item active" data-view="home"><span aria-hidden="true">⌂</span> Home</button>
+        <button class="nav-item" data-view="products"><span aria-hidden="true">▦</span> Products</button>
+        <button class="nav-item" data-view="orders"><span aria-hidden="true">☰</span> Orders</button>
+        <button class="nav-item" data-view="customers"><span aria-hidden="true">◍</span> Customers</button>
+        <button class="nav-item" data-view="chat"><span aria-hidden="true">✦</span> Chat Studio</button>
+        <button class="nav-item" data-view="more"><span aria-hidden="true">◉</span> More</button>
+      </nav>
+      <div class="sidebar-foot">
+        <div class="mode-pill"><span class="mode-dot"></span> Local demo</div>
+        <p>Your data stays on this device.</p>
+      </div>
+    </aside>
+
+    <div class="main-wrap">
+      <header class="topbar">
+        <div class="topbar-left">
+          <button class="icon-btn menu-btn" id="menuBtn" aria-label="Open navigation">☰</button>
+          <div>
+            <p class="eyebrow" id="todayLabel">Today</p>
+            <h1 id="greeting">Welcome back</h1>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <span class="chip" id="shopChip">My Shop</span>
+          <button class="icon-btn" id="themeBtn" aria-label="Toggle theme" title="Toggle theme">◐</button>
+          <button class="icon-btn" id="backupBtn" aria-label="Download backup" title="Download backup">⇩</button>
+        </div>
+      </header>
+
+      <main class="content">
+        <!-- HOME -->
+        <section class="view active" id="view-home">
+          <div class="section-head">
+            <div><h2>Overview</h2><p>What needs your attention today.</p></div>
+            <div class="head-actions">
+              <button class="btn ghost" data-go="products">+ Add product</button>
+              <button class="btn primary" data-go="orders">+ New order</button>
+            </div>
+          </div>
+
+          <div class="backup-notice" id="backupNotice" hidden>
+            <span id="backupNoticeText">It's time to download a backup of your shop data.</span>
+            <div class="row-actions">
+              <button class="btn ghost" id="backupLater">Later</button>
+              <button class="btn primary" id="backupNow">Download backup</button>
+            </div>
+          </div>
+
+          <div class="metrics">
+            <article class="metric-card"><span class="metric-icon teal">☰</span><p class="metric-label">Today's orders</p><strong class="metric-value" id="mTodayOrders">0</strong><span class="metric-note" id="mTodayNote">0 active</span></article>
+            <article class="metric-card"><span class="metric-icon green">₨</span><p class="metric-label">Today's collections</p><strong class="metric-value" id="mCollected">PKR 0</strong><span class="metric-note">Payments received today</span></article>
+            <article class="metric-card"><span class="metric-icon purple">⏳</span><p class="metric-label">Pending balance</p><strong class="metric-value" id="mBalance">PKR 0</strong><span class="metric-note" id="mBalanceNote">From 0 customers</span></article>
+            <article class="metric-card"><span class="metric-icon blue">▦</span><p class="metric-label">Low availability</p><strong class="metric-value" id="mLow">0</strong><span class="metric-note" id="mLowNote">Products to watch</span></article>
+          </div>
+
+          <div class="home-grid">
+            <section class="panel">
+              <div class="panel-head"><h3>Recent orders</h3><button class="text-btn" data-go="orders">View all →</button></div>
+              <div id="recentOrders" class="list"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-head"><h3>Stock watch</h3><button class="text-btn" data-go="products">Manage →</button></div>
+              <div id="stockWatch" class="list"></div>
+            </section>
+          </div>
+
+          <div class="home-grid">
+            <section class="panel">
+              <div class="panel-head"><h3>Pending payments</h3><button class="text-btn" data-go="customers">All customers →</button></div>
+              <div id="pendingPayments" class="list"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-head"><h3>Order pipeline</h3></div>
+              <div id="pipeline" class="pipeline"></div>
+            </section>
+            <section class="panel wide" id="followupPanel">
+              <div class="panel-head">
+                <h3>Follow-up queue</h3>
+                <div class="panel-tools">
+                  <span class="metric-note">Due dates you set on orders</span>
+                  <button class="text-btn" id="selectAllFollowups">Select all</button>
+                  <button class="btn ghost" id="bulkFollowup">Open selected ↗</button>
+                </div>
+              </div>
+              <div id="followupList" class="list"></div>
+            </section>
+          </div>
+
+          <section class="panel accent-panel">
+            <div><h3>✦ Smart drafts are ready</h3><p>Turn any order into a WhatsApp or Instagram reply using your own shop data. Nothing is sent automatically.</p></div>
+            <button class="btn primary" data-go="chat">Open Chat Studio →</button>
+          </section>
+        </section>
+
+        <!-- PRODUCTS -->
+        <section class="view" id="view-products">
+          <div class="section-head"><div><h2>Products &amp; stock</h2><p>Availability already subtracts items reserved in active orders.</p></div></div>
+          <div class="two-col">
+            <section class="panel">
+              <div class="panel-head"><h3 id="productFormTitle">Add a product</h3><button class="text-btn" id="cancelProductEdit" hidden>Cancel edit</button></div>
+              <form id="productForm" class="form-grid">
+                <label class="field full">Product name<input id="pName" required placeholder="e.g. Blue kurta" /></label>
+                <label class="field">SKU / code <small>(optional)</small><input id="pSku" placeholder="e.g. BK-01" /></label>
+                <label class="field">Sale price (PKR)<input id="pPrice" type="number" min="0" step="1" required placeholder="2500" /></label>
+                <label class="field">Cost price (PKR)<input id="pCost" type="number" min="0" step="1" required placeholder="1500" /></label>
+                <label class="field">Stock in shop<input id="pStock" type="number" min="0" step="1" required placeholder="10" /></label>
+                <label class="field">Low alert at<input id="pLow" type="number" min="0" step="1" value="3" /></label>
+                <label class="field">Unit<input id="pUnit" value="pc" placeholder="pc, pack, box…" /></label>
+                <button class="btn primary full" type="submit" id="productSubmit">Save product</button>
+              </form>
+            </section>
+            <section class="panel">
+              <div class="panel-head"><h3>Your catalogue</h3><input id="productSearch" class="search" type="search" placeholder="Search products…" aria-label="Search products" /></div>
+              <div id="productList" class="list"></div>
+            </section>
+          </div>
+        </section>
+
+        <!-- ORDERS -->
+        <section class="view" id="view-orders">
+          <div class="section-head"><div><h2>Orders</h2><p>From WhatsApp or Instagram DM to delivered and paid.</p></div></div>
+          <div class="two-col">
+            <div class="stack">
+              <section class="panel">
+                <div class="panel-head"><h3>Paste a buyer message</h3><button class="text-btn" id="togglePaste">Open</button></div>
+                <div id="pasteBody" hidden>
+                  <p class="field-hint">Paste a WhatsApp or Instagram message. SellMate will suggest a customer and items from your catalogue for review.</p>
+                  <textarea id="pasteText" class="paste-text" rows="4" placeholder="e.g. Assalam o alaikum, I need 2 Blue kurta and 1 Black kurta. My number is 923001234567"></textarea>
+                  <div class="row-actions">
+                    <button class="btn ghost" id="parsePaste">Prepare order</button>
+                    <button class="btn ghost" id="clearPaste">Clear</button>
+                  </div>
+                  <div id="pasteResult" hidden></div>
+                </div>
+              </section>
+
+              <section class="panel">
+                <div class="panel-head"><h3 id="orderFormTitle">New order</h3><button class="text-btn" id="cancelOrderEdit" hidden>Cancel edit</button></div>
+                <form id="orderForm" class="form-grid">
+                  <label class="field full">Customer name<input id="oCustomer" list="customerOptions" required placeholder="Start typing or add new" autocomplete="off" /><datalist id="customerOptions"></datalist></label>
+                  <label class="field">WhatsApp number<input id="oPhone" required inputmode="tel" placeholder="923001234567" /></label>
+                  <label class="field">Instagram handle <small>(optional)</small><input id="oInstagram" placeholder="@shopname" /></label>
+                  <label class="field full">Order source<select id="oSource"><option>WhatsApp</option><option>Instagram</option><option>Phone</option><option>In person</option></select></label>
+
+                  <div class="full items-block">
+                    <div class="items-head"><strong>Items</strong><button class="text-btn" type="button" id="addItemBtn">+ Add item</button></div>
+                    <div id="itemRows"></div>
+                  </div>
+
+                  <label class="field">Discount (PKR)<input id="oDiscount" type="number" min="0" step="1" value="0" /></label>
+                  <label class="field">Delivery charge (PKR)<input id="oDelivery" type="number" min="0" step="1" value="0" /></label>
+                  <label class="field">Payment received now (PKR)<input id="oPaid" type="number" min="0" step="1" value="0" /></label>
+                  <label class="field">Payment method<select id="oMethod"><option>Cash</option><option>Easypaisa</option><option>JazzCash</option><option>Bank transfer</option><option>Other</option></select></label>
+                  <label class="field">Payment due date<input id="oDueDate" type="date" /></label>
+                  <label class="field">Courier <small>(optional)</small><input id="oCourier" placeholder="e.g. TCS" /></label>
+                  <label class="field full">Tracking number <small>(optional)</small><input id="oTracking" placeholder="Courier tracking ID" /></label>
+                  <label class="field full">Delivery address <small>(optional)</small><input id="oAddress" placeholder="Area, city, landmark…" /></label>
+                  <label class="field full">Internal notes <small>(optional)</small><input id="oNotes" placeholder="Gift wrap, colour preference, follow-up…" /></label>
+
+                  <div class="full total-strip" id="orderTotals"></div>
+                  <button class="btn primary full" type="submit" id="orderSubmit">Save order</button>
+                </form>
+              </section>
+            </div>
+
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Order list</h3>
+                <div class="panel-tools">
+                  <input id="orderSearch" class="search" type="search" placeholder="Search orders…" aria-label="Search orders" />
+                  <select id="orderFilter" class="search" aria-label="Filter orders">
+                    <option value="All">All statuses</option>
+                    <option>New</option><option>Confirmed</option><option>Packed</option>
+                    <option>Dispatched</option><option>Delivered</option><option>Returned</option><option>Cancelled</option>
+                  </select>
+                  <input id="orderFrom" class="search date-filter" type="date" aria-label="Orders from date" title="From date" />
+                  <input id="orderTo" class="search date-filter" type="date" aria-label="Orders to date" title="To date" />
+                  <button class="text-btn" id="clearDateFilters">Clear dates</button>
+                </div>
+              </div>
+              <div id="orderList" class="list"></div>
+            </section>
+          </div>
+        </section>
+
+        <!-- CUSTOMERS -->
+        <section class="view" id="view-customers">
+          <div class="section-head"><div><h2>Customers</h2><p>Repeat buyers, pending balances and one-tap follow-ups.</p></div></div>
+          <div class="two-col">
+            <section class="panel">
+              <div class="panel-head"><h3 id="customerFormTitle">Add a customer</h3><button class="text-btn" id="cancelCustomerEdit" hidden>Cancel edit</button></div>
+              <form id="customerForm" class="form-grid">
+                <label class="field full">Name<input id="cName" required placeholder="e.g. Ayesha" /></label>
+                <label class="field">WhatsApp number<input id="cPhone" required inputmode="tel" placeholder="923001234567" /></label>
+                <label class="field">Instagram handle<input id="cInstagram" placeholder="@ayesha" /></label>
+                <label class="field full">Notes<input id="cNotes" placeholder="Prefers cash on delivery, likes blue…" /></label>
+                <button class="btn primary full" type="submit" id="customerSubmit">Save customer</button>
+              </form>
+            </section>
+            <section class="panel">
+              <div class="panel-head"><h3>Your customers</h3><input id="customerSearch" class="search" type="search" placeholder="Search customers…" aria-label="Search customers" /></div>
+              <div id="customerList" class="list"></div>
+            </section>
+          </div>
+
+          <section class="panel ledger-panel" id="ledgerPanel" hidden>
+            <div class="panel-head"><h3 id="ledgerTitle">Customer ledger</h3><button class="text-btn" id="closeLedger">Close</button></div>
+            <div id="ledgerSummary" class="total-strip"></div>
+            <div id="ledgerTimeline" class="list"></div>
+            <div class="pay-form ledger-pay">
+              <label class="field">Amount<input id="ledgerAmount" type="number" min="1" step="1" placeholder="0" /></label>
+              <label class="field">Method<select id="ledgerMethod"><option>Cash</option><option>Easypaisa</option><option>JazzCash</option><option>Bank transfer</option><option>Other</option></select></label>
+              <label class="field">Note<input id="ledgerNote" placeholder="Optional" /></label>
+              <button class="btn primary" id="ledgerPayBtn">Record payment</button>
+            </div>
+            <div class="draft-actions">
+              <button class="btn ghost" id="copyStatement">Copy statement</button>
+              <button class="btn primary" id="whatsappStatement">Open WhatsApp ↗</button>
+            </div>
+          </section>
+        </section>
+
+        <!-- CHAT STUDIO -->
+        <section class="view" id="view-chat">
+          <div class="section-head">
+            <div><h2>Chat Studio</h2><p>Smart drafts built from real orders. Copy for Instagram, open prefilled in WhatsApp.</p></div>
+            <span class="chip demo">Offline drafts · no API key</span>
+          </div>
+          <div class="chat-layout">
+            <aside class="panel thread-panel">
+              <div class="panel-head"><h3>Conversations</h3></div>
+              <div id="threadList" class="threads"></div>
+            </aside>
+            <section class="panel conversation-panel">
+              <div class="chat-head">
+                <div><h3 id="chatName">Select a conversation</h3><p id="chatMeta">Choose a customer on the left.</p></div>
+                <div class="chat-links">
+                  <button class="icon-btn" id="whatsAppBtn" title="Open WhatsApp" aria-label="Open WhatsApp">↗</button>
+                  <button class="icon-btn" id="instagramBtn" title="Open Instagram profile" aria-label="Open Instagram profile">◎</button>
+                </div>
+              </div>
+              <div id="chatMessages" class="messages"><div class="empty-state">Pick a customer to get started.</div></div>
+              <div class="reply-paste">
+                <div class="panel-head"><h3>Paste buyer message → ready reply</h3><button class="text-btn" id="toggleReplyPaste">Open</button></div>
+                <div id="replyPasteBody" hidden>
+                  <p class="field-hint">Paste their question. SellMate picks the closest reply and fills in your order details.</p>
+                  <textarea id="replyPasteText" class="paste-text" rows="3" placeholder="e.g. Is the blue kurta available? What is the price?"></textarea>
+                  <div class="row-actions"><button class="btn ghost" id="makePasteReply">Prepare reply</button><button class="text-btn" id="clearPasteReply">Clear</button></div>
+                </div>
+              </div>
+              <div class="template-bar" id="templateBar">
+                <button class="mini-btn" data-template="stock">Availability</button>
+                <button class="mini-btn" data-template="quote">Price quote</button>
+                <button class="mini-btn" data-template="confirm">Confirmation</button>
+                <button class="mini-btn" data-template="reminder">Payment reminder</button>
+                <button class="mini-btn" data-template="dispatch">Dispatch update</button>
+                <button class="mini-btn" data-template="delivered">Delivered thanks</button>
+                <button class="mini-btn" data-template="followup">Follow-up</button>
+              </div>
+              <div class="ai-draft" id="aiDraftBox" hidden>
+                <div class="ai-draft-head"><span>✦ Smart draft</span><button class="text-btn" id="useDraft">Use this →</button></div>
+                <p id="aiDraftText"></p>
+                <div class="draft-actions">
+                  <button class="btn ghost" id="copyDraft">Copy text</button>
+                  <button class="btn primary" id="sendWhatsApp">Open WhatsApp ↗</button>
+                </div>
+              </div>
+              <form id="chatForm" class="composer">
+                <input id="chatInput" placeholder="Type a reply…" autocomplete="off" />
+                <button class="btn primary" type="submit">Save note ↗</button>
+              </form>
+            </section>
+          </div>
+        </section>
+
+        <!-- MORE -->
+        <section class="view" id="view-more">
+          <div class="section-head"><div><h2>More</h2><p>Expenses, settings, reports and your data.</p></div></div>
+          <div class="two-col">
+            <section class="panel">
+              <div class="panel-head"><h3>Expenses</h3></div>
+              <form id="expenseForm" class="form-grid">
+                <label class="field full">Expense name<input id="eName" required placeholder="e.g. Packaging" /></label>
+                <label class="field">Amount (PKR)<input id="eAmount" type="number" min="0" step="1" required /></label>
+                <label class="field">Category<select id="eCategory"><option>Packaging</option><option>Transport</option><option>Rent</option><option>Utilities</option><option>Supplies</option><option>Other</option></select></label>
+                <button class="btn primary full" type="submit">Add expense</button>
+              </form>
+              <div id="expenseList" class="list compact"></div>
+            </section>
+            <div class="stack">
+              <section class="panel">
+                <div class="panel-head"><h3>Shop settings</h3></div>
+                <label class="field">Shop name<input id="shopName" placeholder="e.g. Samad Store" /></label>
+                <p class="backup-meta" id="lastBackupLabel">No backup downloaded yet.</p>
+                <div class="settings-row">
+                  <button class="btn ghost" id="restoreBtn">Restore backup</button>
+                  <button class="btn danger-ghost" id="resetBtn">Reset demo data</button>
+                </div>
+                <input id="restoreFile" type="file" accept="application/json" hidden />
+              </section>
+              <section class="panel">
+                <div class="panel-head"><h3>Connections</h3></div>
+                <div class="connection"><div><strong>WhatsApp</strong><small>Opens wa.me with your draft. No automatic messages.</small></div><span class="status-tag">Ready</span></div>
+                <div class="connection"><div><strong>Instagram</strong><small>Copy a draft and paste it into a DM. Optional profile link.</small></div><span class="status-tag">Ready</span></div>
+                <div class="connection"><div><strong>AI replies</strong><small>Drafts are generated offline from your own data. No API key yet.</small></div><span class="status-tag">Offline</span></div>
+              </section>
+            </div>
+          </div>
+
+          <section class="panel suppliers-panel">
+            <div class="panel-head"><h3>Suppliers — what you owe</h3></div>
+            <div class="two-col">
+              <form id="supplierForm" class="form-grid">
+                <label class="field full">Supplier name<input id="sName" required placeholder="e.g. Metro Wholesale" /></label>
+                <label class="field">WhatsApp number<input id="sPhone" required inputmode="tel" placeholder="923001234567" /></label>
+                <label class="field">Notes<input id="sNotes" placeholder="Payment terms, delivery days…" /></label>
+                <button class="btn primary full" type="submit" id="supplierSubmit">Save supplier</button>
+                <button class="text-btn full" type="button" id="cancelSupplierEdit" hidden>Cancel edit</button>
+              </form>
+              <div id="supplierList" class="list"></div>
+            </div>
+            <div class="supplier-ledger" id="supplierLedger" hidden>
+              <div class="panel-head"><h3 id="supplierLedgerTitle">Supplier ledger</h3><button class="text-btn" id="closeSupplierLedger">Close</button></div>
+              <div id="supplierSummary" class="total-strip"></div>
+              <div id="supplierTimeline" class="list"></div>
+              <div class="pay-form supplier-forms">
+                <label class="field">Bill amount<input id="supplierBillAmount" type="number" min="1" step="1" placeholder="0" /></label>
+                <label class="field">Bill note<input id="supplierBillNote" placeholder="e.g. Stock invoice" /></label>
+                <button class="btn ghost" id="supplierAddBill">Add bill</button>
+              </div>
+              <div class="pay-form supplier-forms">
+                <label class="field">Paid amount<input id="supplierPayAmount" type="number" min="1" step="1" placeholder="0" /></label>
+                <label class="field">Method<select id="supplierPayMethod"><option>Cash</option><option>Easypaisa</option><option>JazzCash</option><option>Bank transfer</option><option>Other</option></select></label>
+                <label class="field">Note<input id="supplierPayNote" placeholder="Optional" /></label>
+                <button class="btn primary" id="supplierAddPay">Record payment</button>
+              </div>
+              <div class="draft-actions">
+                <button class="btn ghost" id="copySupplierStatement">Copy statement</button>
+                <button class="btn primary" id="whatsappSupplier">Open WhatsApp ↗</button>
+                <button class="btn danger-ghost" id="deleteSupplier">Delete supplier</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel reply-panel">
+            <div class="panel-head">
+              <h3>Quick replies</h3>
+              <div class="panel-tools">
+                <button class="text-btn" id="resetReplies">Reset defaults</button>
+                <button class="btn primary" id="saveReplies">Save replies</button>
+              </div>
+            </div>
+            <p class="field-hint">Write replies in your own words. Placeholders: {{name}}, {{items}}, {{total}}, {{paid}}, {{balance}}, {{balanceLine}}, {{code}}, {{due}}, {{courier}}, {{tracking}}, {{shop}}. Leave blank to use the built-in wording.</p>
+            <div id="replyTemplates" class="reply-grid"></div>
+          </section>
+
+          <section class="panel reports-panel">
+            <div class="panel-head"><h3>Reports &amp; tools</h3></div>
+            <div class="report-grid">
+              <div class="report-card">
+                <h4>Day Book</h4>
+                <p class="field-hint">A closing summary for one date.</p>
+                <label class="field">Date<input id="reportDate" type="date" /></label>
+                <div class="row-actions">
+                  <button class="btn ghost" id="generateDayBook">Generate</button>
+                  <button class="btn ghost" id="copyDayBook">Copy</button>
+                </div>
+                <pre id="dayBookOutput" class="report-output">Choose a date and generate a summary.</pre>
+              </div>
+
+              <div class="report-card">
+                <h4>Quick price list</h4>
+                <p class="field-hint">Pick products, then paste the list into a chat.</p>
+                <label class="check-line"><input type="checkbox" id="priceOnlyAvailable" /> Only available items</label>
+                <div id="priceProducts" class="check-list"></div>
+                <label class="field">WhatsApp number <small>(optional)</small><input id="pricePhone" inputmode="tel" placeholder="923001234567" /></label>
+                <div class="row-actions">
+                  <button class="btn ghost" id="generatePriceList">Generate</button>
+                  <button class="btn ghost" id="copyPriceList">Copy</button>
+                  <button class="btn primary" id="sendPriceList">Open WhatsApp ↗</button>
+                </div>
+                <pre id="priceOutput" class="report-output">Generate a price list to share.</pre>
+              </div>
+
+              <div class="report-card">
+                <h4>Restock list</h4>
+                <p class="field-hint">Low items with a suggested reorder quantity.</p>
+                <label class="field">Supplier WhatsApp <small>(optional)</small><input id="supplierPhone" inputmode="tel" placeholder="923001234567" /></label>
+                <div class="row-actions">
+                  <button class="btn ghost" id="generateRestock">Generate</button>
+                  <button class="btn ghost" id="copyRestock">Copy</button>
+                  <button class="btn primary" id="sendRestock">Open WhatsApp ↗</button>
+                </div>
+                <pre id="restockOutput" class="report-output">Generate a restock list to send to your supplier.</pre>
+              </div>
+
+              <div class="report-card">
+                <h4>CSV export</h4>
+                <p class="field-hint">For accounting, tax or your own records.</p>
+                <div class="csv-buttons">
+                  <button class="btn ghost" id="exportOrdersCsv">Orders CSV</button>
+                  <button class="btn ghost" id="exportPaymentsCsv">Payments CSV</button>
+                  <button class="btn ghost" id="exportCustomersCsv">Customers CSV</button>
+                  <button class="btn ghost" id="exportProductsCsv">Products CSV</button>
+                  <button class="btn ghost" id="exportSuppliersCsv">Suppliers CSV</button>
+                </div>
+              </div>
+
+              <div class="report-card">
+                <h4>Top sellers &amp; monthly summary</h4>
+                <p class="field-hint">Best movers and profit for one month.</p>
+                <label class="field">Month<input id="insightMonth" type="month" /></label>
+                <div class="row-actions">
+                  <button class="btn ghost" id="generateInsights">Generate</button>
+                  <button class="btn ghost" id="copyInsights">Copy</button>
+                </div>
+                <pre id="insightsOutput" class="report-output">Generate a monthly summary.</pre>
+              </div>
+            </div>
+          </section>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <nav class="bottom-nav" aria-label="Mobile navigation">
+    <button class="nav-item active" data-view="home"><span>⌂</span>Home</button>
+    <button class="nav-item" data-view="products"><span>▦</span>Products</button>
+    <button class="nav-item" data-view="orders"><span>☰</span>Orders</button>
+    <button class="nav-item" data-view="customers"><span>◍</span>Customers</button>
+    <button class="nav-item" data-view="chat"><span>✦</span>Chat</button>
+  </nav>
+
+  <div class="toast-area" id="toastArea" aria-live="polite"></div>
+  <script src="script.js"></script>
+</body>
+</html>

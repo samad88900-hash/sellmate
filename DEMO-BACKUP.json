@@ -1,0 +1,245 @@
+{
+  "app": "SellMate",
+  "version": 2,
+  "createdAt": "2026-11-20T00:00:00.000Z",
+  "products": [
+    {
+      "id": "p1",
+      "name": "Blue kurta",
+      "sku": "BK-01",
+      "price": 2500,
+      "cost": 1500,
+      "stock": 12,
+      "low": 3,
+      "unit": "pc"
+    },
+    {
+      "id": "p2",
+      "name": "Black kurta",
+      "sku": "BK-02",
+      "price": 2800,
+      "cost": 1700,
+      "stock": 2,
+      "low": 3,
+      "unit": "pc"
+    }
+  ],
+  "customers": [
+    {
+      "id": "c1",
+      "name": "Ayesha",
+      "phone": "923001234567",
+      "instagram": "@ayesha",
+      "notes": "",
+      "payments": [],
+      "createdAt": "2026-11-01"
+    },
+    {
+      "id": "c2",
+      "name": "Bilal",
+      "phone": "923009876543",
+      "instagram": "",
+      "notes": "",
+      "payments": [],
+      "createdAt": "2026-11-01"
+    }
+  ],
+  "orders": [
+    {
+      "id": "o1",
+      "code": "SM-1001",
+      "customerId": "c1",
+      "customerName": "Ayesha",
+      "phone": "923001234567",
+      "instagram": "@ayesha",
+      "source": "WhatsApp",
+      "items": [
+        {
+          "productId": "p1",
+          "name": "Blue kurta",
+          "qty": 2,
+          "price": 2500,
+          "cost": 1500
+        }
+      ],
+      "discount": 0,
+      "delivery": 200,
+      "payments": [
+        {
+          "id": "pay1",
+          "amount": 4700,
+          "method": "Cash",
+          "note": "With order",
+          "date": "2026-11-20"
+        }
+      ],
+      "dueDate": "2026-11-19",
+      "courier": "TCS",
+      "tracking": "TRK123",
+      "address": "",
+      "notes": "Test order",
+      "status": "Delivered",
+      "date": "2026-11-20",
+      "updatedAt": "2026-11-20",
+      "dispatched": true,
+      "returned": false,
+      "cancelled": false
+    },
+    {
+      "id": "o2",
+      "code": "SM-1002",
+      "customerId": "c2",
+      "customerName": "Bilal",
+      "phone": "923009876543",
+      "instagram": "",
+      "source": "Instagram",
+      "items": [
+        {
+          "productId": "p2",
+          "name": "Black kurta",
+          "qty": 1,
+          "price": 2800,
+          "cost": 1700
+        }
+      ],
+      "discount": 0,
+      "delivery": 0,
+      "payments": [],
+      "dueDate": "2026-11-19",
+      "courier": "",
+      "tracking": "",
+      "address": "",
+      "notes": "",
+      "status": "New",
+      "date": "2026-11-20",
+      "updatedAt": "2026-11-20",
+      "dispatched": false,
+      "returned": false,
+      "cancelled": false
+    },
+    {
+      "id": "o3",
+      "code": "SM-1003",
+      "customerId": "c1",
+      "customerName": "Ayesha",
+      "phone": "923001234567",
+      "instagram": "@ayesha",
+      "source": "WhatsApp",
+      "items": [
+        {
+          "productId": "p1",
+          "name": "Blue kurta",
+          "qty": 1,
+          "price": 2500,
+          "cost": 1500
+        }
+      ],
+      "discount": 0,
+      "delivery": 0,
+      "payments": [
+        {
+          "id": "pay3",
+          "amount": 2500,
+          "method": "Easypaisa",
+          "note": "",
+          "date": "2026-11-01"
+        }
+      ],
+      "dueDate": "",
+      "courier": "",
+      "tracking": "",
+      "address": "",
+      "notes": "",
+      "status": "Delivered",
+      "date": "2026-11-01",
+      "updatedAt": "2026-11-01",
+      "dispatched": true,
+      "returned": false,
+      "cancelled": false
+    },
+    {
+      "id": "o4",
+      "code": "SM-1004",
+      "customerId": "c2",
+      "customerName": "Bilal",
+      "phone": "923009876543",
+      "instagram": "",
+      "source": "Phone",
+      "items": [
+        {
+          "productId": "p2",
+          "name": "Black kurta",
+          "qty": 1,
+          "price": 2800,
+          "cost": 1700
+        }
+      ],
+      "discount": 0,
+      "delivery": 0,
+      "payments": [],
+      "dueDate": "",
+      "courier": "",
+      "tracking": "",
+      "address": "",
+      "notes": "",
+      "status": "Cancelled",
+      "date": "2026-11-19",
+      "updatedAt": "2026-11-19",
+      "dispatched": false,
+      "returned": true,
+      "cancelled": true
+    }
+  ],
+  "expenses": [
+    {
+      "id": "ex1",
+      "name": "Packing rolls",
+      "amount": 300,
+      "date": "2026-11-20",
+      "category": "Packaging"
+    },
+    {
+      "id": "ex2",
+      "name": "Bike fuel",
+      "amount": 150,
+      "date": "2026-11-20",
+      "category": "Transport"
+    }
+  ],
+  "suppliers": [
+    {
+      "id": "s1",
+      "name": "Metro Wholesale",
+      "phone": "923007777777",
+      "notes": "Weekly credit",
+      "bills": [
+        {
+          "id": "b1",
+          "amount": 20000,
+          "note": "Stock invoice",
+          "date": "2026-11-19"
+        }
+      ],
+      "payments": [
+        {
+          "id": "sp1",
+          "amount": 5000,
+          "method": "Easypaisa",
+          "note": "Advance",
+          "date": "2026-11-20"
+        }
+      ]
+    }
+  ],
+  "chats": {},
+  "settings": {
+    "shopName": "Test Shop",
+    "theme": "dark",
+    "nextCode": 1005,
+    "lastBackupAt": null,
+    "backupSnoozedAt": null,
+    "replies": {
+      "reminder": "Salam {{name}}, order {{code}} balance {{balance}} due {{due}}. — {{shop}}"
+    }
+  }
+}
