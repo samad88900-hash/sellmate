@@ -1,5 +1,5 @@
 /* SellMate service worker — offline cache for the app shell. */
-const CACHE = "sellmate-v27";
+const CACHE = "sellmate-v28";
 const ASSETS = [
   "./",
   "./index.html",

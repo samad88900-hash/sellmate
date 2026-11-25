@@ -206,6 +206,9 @@ button { cursor: pointer; }
 .btn.primary:hover { background: var(--accent); filter: brightness(.96); }
 .btn.ghost { background: var(--surface); border-color: var(--line); color: var(--text); }
 .btn.ghost:hover { background: var(--surface-2); border-color: var(--line-strong); }
+.btn.google-btn { background: #ffffff; border-color: #dfe3e8; color: #202124; box-shadow: 0 1px 2px rgba(0, 0, 0, .18); }
+.btn.google-btn:hover { background: #f8f9fa; border-color: #c9ced6; box-shadow: 0 2px 6px rgba(0, 0, 0, .22); }
+.btn.google-btn .google-logo { width: 18px; height: 18px; flex: 0 0 auto; }
 .btn.danger-ghost { background: var(--red-soft); border-color: var(--line); color: var(--red); }
 .text-btn {
   background: none; border: 0; color: var(--accent);
