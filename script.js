@@ -443,11 +443,15 @@
 
     const searchParams = new URLSearchParams(window.location.search);
     const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-    recoveryIntent = searchParams.get("type") === "recovery"
-      || hashParams.get("type") === "recovery"
-      || !!searchParams.get("code")
-      || hashParams.has("access_token");
+    recoveryIntent = searchParams.get("type") === "recovery" || hashParams.get("type") === "recovery";
     const code = searchParams.get("code");
+    const oauthError = searchParams.get("error_description") || hashParams.get("error_description")
+      || searchParams.get("error") || hashParams.get("error");
+    if (oauthError && !recoveryIntent) {
+      showAuthScreen();
+      setAuthStatus(decodeURIComponent(oauthError).replace(/\+/g, " "), "warn");
+      return;
+    }
 
     sb = window.supabase.createClient(cfg.url, cfg.anonKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
     sb.auth.onAuthStateChange((event, session) => {
