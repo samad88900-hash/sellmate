@@ -37,6 +37,7 @@
   let recoveryIntent = false;
   let recoveryNeedsOld = false;
   let suppressAuthHandling = false;
+  let pendingPhone = null;
   let cloudReady = false;
   let saveTimer = null;
   let saving = false;
@@ -261,9 +262,12 @@
   function authTab(tab) {
     const login = tab === "login";
     const signup = tab === "signup";
+    const phone = tab === "phone";
     document.getElementById("loginForm").hidden = !login;
     document.getElementById("signupForm").hidden = !signup;
+    document.getElementById("phoneForm").hidden = !phone;
     document.getElementById("recoveryForm").hidden = true;
+    if (!phone) document.getElementById("otpBox").hidden = true;
     document.querySelectorAll("[data-auth-tab]").forEach((b) => b.classList.toggle("active", b.dataset.authTab === tab));
     setAuthStatus("");
   }
@@ -280,6 +284,8 @@
       : "Set a new password for your account.";
     document.getElementById("loginForm").hidden = true;
     document.getElementById("signupForm").hidden = true;
+    document.getElementById("phoneForm").hidden = true;
+    document.getElementById("otpBox").hidden = true;
     document.getElementById("recoveryForm").hidden = false;
     document.querySelectorAll("[data-auth-tab]").forEach((b) => b.classList.remove("active"));
     showAuthScreen();
@@ -357,7 +363,7 @@
       activePhone = null; paymentOpenId = null; activeLedgerId = null; activeSupplierId = null; editingSupplier = null;
       parsedPaste = null; selectedPriceIds = null; selectedFollowups = new Set();
       const emailEl = document.getElementById("accountEmail");
-      if (emailEl) emailEl.textContent = currentUser.email || "Signed in";
+      if (emailEl) emailEl.textContent = currentUser.email || currentUser.phone || "Signed in";
       showAppShell();
       applySettings();
       renderProductOptions();
@@ -393,6 +399,43 @@
     const redirectTo = window.location.origin + window.location.pathname;
     const { error } = await sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo } });
     if (error) throw error;
+  }
+
+  function normalizePhone(raw) {
+    const trimmed = String(raw || "").trim();
+    const cleaned = trimmed.replace(/[\s\-()]/g, "");
+    if (cleaned.startsWith("+")) return /^\+[0-9]{8,15}$/.test(cleaned) ? cleaned : null;
+    let digits = cleaned.replace(/\D/g, "");
+    if (digits.startsWith("92")) digits = digits.slice(2);
+    else if (digits.startsWith("0")) digits = digits.slice(1);
+    if (/^3[0-9]{9}$/.test(digits)) return "+92" + digits;
+    if (/^[0-9]{8,15}$/.test(digits)) return "+" + digits;
+    return null;
+  }
+
+  async function sendPhoneCode() {
+    const phone = normalizePhone(document.getElementById("phoneNumber").value);
+    if (!phone) throw new Error("Enter a valid mobile number, e.g. 03001234567.");
+    const shopName = document.getElementById("phoneShop").value.trim();
+    setAuthStatus("Sending SMS code...");
+    const { error } = await sb.auth.signInWithOtp({
+      phone,
+      options: { data: { shop_name: shopName || "My Shop" } }
+    });
+    if (error) throw error;
+    pendingPhone = phone;
+    document.getElementById("otpBox").hidden = false;
+    setAuthStatus("Code sent to " + phone + ". Enter the 6-digit code below.", "ok");
+  }
+
+  async function verifyPhoneCode() {
+    if (!pendingPhone) throw new Error("Request a code first.");
+    const token = document.getElementById("phoneOtp").value.trim();
+    if (!/^\d{6}$/.test(token)) throw new Error("Enter the 6-digit code.");
+    setAuthStatus("Verifying code...");
+    const { error } = await sb.auth.verifyOtp({ phone: pendingPhone, token, type: "sms" });
+    if (error) throw error;
+    setAuthStatus("");
   }
 
   async function signOut() {
@@ -2225,6 +2268,25 @@
       } catch (err) { setAuthStatus(err.message || "Signup failed.", "warn"); } finally { btn.disabled = false; }
     });
     document.getElementById("googleAuthBtn").addEventListener("click", async () => { try { await signInWithGoogle(); } catch (err) { setAuthStatus(err.message || "Google sign-in failed.", "warn"); } });
+    document.getElementById("phoneForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById("sendCodeBtn"); btn.disabled = true;
+      try { await sendPhoneCode(); }
+      catch (err) { setAuthStatus(err.message || "Could not send SMS code.", "warn"); }
+      finally { btn.disabled = false; }
+    });
+    document.getElementById("verifyOtpBtn").addEventListener("click", async () => {
+      const btn = document.getElementById("verifyOtpBtn"); btn.disabled = true;
+      try { await verifyPhoneCode(); }
+      catch (err) { setAuthStatus(err.message || "Could not verify code.", "warn"); }
+      finally { btn.disabled = false; }
+    });
+    document.getElementById("resendCodeBtn").addEventListener("click", async () => {
+      const btn = document.getElementById("resendCodeBtn"); btn.disabled = true;
+      try { await sendPhoneCode(); }
+      catch (err) { setAuthStatus(err.message || "Could not resend code.", "warn"); }
+      finally { btn.disabled = false; }
+    });
     document.getElementById("forgotPasswordBtn").addEventListener("click", async () => {
       const email = document.getElementById("loginEmail").value.trim();
       try { await resetPassword(email); setAuthStatus("Password reset email sent. Check your inbox/spam.", "ok"); }

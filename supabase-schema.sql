@@ -36,6 +36,10 @@ create policy "workspaces_update_own" on public.workspaces for update using (aut
 drop policy if exists "workspaces_delete_own" on public.workspaces;
 create policy "workspaces_delete_own" on public.workspaces for delete using (auth.uid() = user_id);
 
+grant usage on schema public to anon, authenticated;
+grant select, insert, update, delete on public.profiles to authenticated;
+grant select, insert, update, delete on public.workspaces to authenticated;
+
 -- Auto-create profile on signup
 create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer set search_path = public as $$

@@ -29,6 +29,7 @@
       <div class="auth-tabs" role="tablist" aria-label="Authentication">
         <button class="auth-tab active" type="button" data-auth-tab="login">Log in</button>
         <button class="auth-tab" type="button" data-auth-tab="signup">Create account</button>
+        <button class="auth-tab" type="button" data-auth-tab="phone">Phone OTP</button>
       </div>
 
       <form id="loginForm" class="auth-form">
@@ -61,6 +62,20 @@
           </div>
         </label>
         <button class="btn primary full" type="submit" id="signupBtn">Create account</button>
+      </form>
+
+      <form id="phoneForm" class="auth-form" hidden>
+        <label class="field">Shop name<input id="phoneShop" type="text" autocomplete="organization" placeholder="e.g. Samad Store" /></label>
+        <label class="field">Mobile number<input id="phoneNumber" type="tel" autocomplete="tel" inputmode="tel" required placeholder="03XX XXXXXXX or +92 3XX XXXXXXX" /></label>
+        <p class="phone-hint">We send a 6-digit code by SMS from our phone. Pakistan numbers welcome.</p>
+        <button class="btn primary full" type="submit" id="sendCodeBtn">Send code</button>
+        <div class="otp-box" id="otpBox" hidden>
+          <label class="field">6-digit code
+            <input id="phoneOtp" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required placeholder="000000" class="otp-input" />
+          </label>
+          <button class="btn primary full" type="button" id="verifyOtpBtn">Verify &amp; sign in</button>
+          <button class="link-btn" type="button" id="resendCodeBtn">Send code again</button>
+        </div>
       </form>
 
       <form id="recoveryForm" class="auth-form" hidden>
