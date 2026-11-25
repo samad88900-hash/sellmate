@@ -41,7 +41,7 @@ begin
     ),
     body := jsonb_build_object(
       'recipients', jsonb_build_array(v_phone),
-      'message', 'SellMate code: ' || v_otp || '. Do not share it.'
+      'message', 'Your SellMate code is: ' || v_otp || '. Do not share it.' || chr(10) || '@sellmate-draft.netlify.app #' || v_otp
     )
   );
 

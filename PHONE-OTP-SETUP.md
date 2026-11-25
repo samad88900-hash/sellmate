@@ -36,6 +36,12 @@ The SQL creates `public.sellmate_send_sms`, enables `pg_net`, and locks the func
 3. The SMS arrives from your paired phone. Enter the 6-digit code and press **Verify & sign in**.
 4. You get your own private cloud workspace, same as email/Google users.
 
+## iPhone users
+- Logging in from an iPhone is fully supported. The customer's phone can be Android or iPhone — only the SMS text is entered.
+- The SMS is formatted for iPhone/Safari AutoFill: the last line is `@sellmate-draft.netlify.app #123456`, so Safari can suggest the code automatically in the OTP field.
+- For the app as a home-screen icon on iPhone: open the site in **Safari** → **Share** → **Add to Home Screen**.
+- The only Android requirement is the **sender/gateway** phone paired with textbee. An iPhone cannot be used as that sender; it can only receive the code.
+
 ## Limits and notes
 - One phone sends roughly 10–15 SMS/minute. Add more phones in textbee for more volume.
 - If the paired phone is offline, codes queue and may expire. Keep it online.
