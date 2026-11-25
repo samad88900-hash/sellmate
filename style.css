@@ -481,6 +481,8 @@ button { cursor: pointer; }
 .auth-status.warn { color: var(--red); }
 .auth-status.ok { color: var(--accent); }
 .auth-note { margin-top: 8px; font-size: 11px; color: var(--faint); text-align: center; line-height: 1.5; }
+.auth-note a { color: var(--accent); text-decoration: none; }
+.auth-note a:hover { text-decoration: underline; }
 .account-card { display: grid; gap: 10px; }
 .account-meta strong { display: block; font-size: 13px; }
 .account-meta span { display: block; font-size: 11px; color: var(--muted); word-break: break-word; }
