@@ -267,6 +267,7 @@
     document.getElementById("signupForm").hidden = !signup;
     document.getElementById("phoneForm").hidden = !phone;
     document.getElementById("recoveryForm").hidden = true;
+    document.getElementById("phoneAuthBtn").hidden = phone;
     if (!phone) document.getElementById("otpBox").hidden = true;
     document.querySelectorAll("[data-auth-tab]").forEach((b) => b.classList.toggle("active", b.dataset.authTab === tab));
     setAuthStatus("");
@@ -286,6 +287,7 @@
     document.getElementById("signupForm").hidden = true;
     document.getElementById("phoneForm").hidden = true;
     document.getElementById("otpBox").hidden = true;
+    document.getElementById("phoneAuthBtn").hidden = true;
     document.getElementById("recoveryForm").hidden = false;
     document.querySelectorAll("[data-auth-tab]").forEach((b) => b.classList.remove("active"));
     showAuthScreen();
@@ -2268,6 +2270,7 @@
       } catch (err) { setAuthStatus(err.message || "Signup failed.", "warn"); } finally { btn.disabled = false; }
     });
     document.getElementById("googleAuthBtn").addEventListener("click", async () => { try { await signInWithGoogle(); } catch (err) { setAuthStatus(err.message || "Google sign-in failed.", "warn"); } });
+    document.getElementById("phoneAuthBtn").addEventListener("click", () => { authTab("phone"); document.getElementById("phoneNumber").focus(); });
     document.getElementById("phoneForm").addEventListener("submit", async (e) => {
       e.preventDefault();
       const btn = document.getElementById("sendCodeBtn"); btn.disabled = true;
