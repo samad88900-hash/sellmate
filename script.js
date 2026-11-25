@@ -1,13 +1,12 @@
 /* ============================================================
-   SellMate v2 — orders, payments, customers, smart drafts
-   Plain JavaScript · no libraries
+   SellMate v3 — cloud accounts (Supabase) + existing workspace
+   Plain JavaScript · no build step
    ============================================================ */
 
 (function () {
   "use strict";
 
-  const STORE = "sellmate.v2";
-  const OLD_STORE = "sellmate.v1";
+  const STORE = "sellmate.v2"; // legacy local key (not used for cloud mode)
   const STATUSES = ["New", "Confirmed", "Packed", "Dispatched", "Delivered", "Returned", "Cancelled"];
   const PRE_DISPATCH = ["New", "Confirmed", "Packed"];
   const METHODS = ["Cash", "Easypaisa", "JazzCash", "Bank transfer", "Other"];
@@ -32,7 +31,16 @@
     }
   });
 
-  let state = load();
+  let state = blank();
+  let currentUser = null;
+  let sb = null;
+  let recoveryIntent = false;
+  let recoveryNeedsOld = false;
+  let suppressAuthHandling = false;
+  let cloudReady = false;
+  let saveTimer = null;
+  let saving = false;
+  let queuedSave = false;
   let editingProduct = null;
   let editingOrder = null;
   let editingCustomer = null;
@@ -51,7 +59,7 @@
   let editingSupplier = null;
   let selectedFollowups = new Set();
 
-  /* ---------- Small helpers ---------- */
+/* ---------- Small helpers ---------- */
   function uid() {
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   }
@@ -174,11 +182,23 @@
     window.open("https://wa.me/" + (clean ? clean : "") + "?text=" + encodeURIComponent(text || "Hello!"), "_blank", "noopener");
   }
 
-  /* ---------- Storage + migration ---------- */
+  /* ---------- Cloud (Supabase) ---------- */
+  function supabaseConfig() {
+    const cfg = window.SELLMATE_SUPABASE || {};
+    const url = String(cfg.url || "").trim();
+    const anonKey = String(cfg.anonKey || "").trim();
+    if (!url || !anonKey || /YOUR_SUPABASE|PASTE_YOUR/i.test(url + anonKey)) return null;
+    return { url, anonKey };
+  }
+
   function normalizeSettings(saved) {
     const base = blank().settings;
     const replies = saved && saved.replies && typeof saved.replies === "object" ? saved.replies : {};
-    return Object.assign(base, saved || {}, { replies });
+    const out = Object.assign(base, saved || {}, { replies });
+    out.shopName = String(out.shopName || "My Shop").trim() || "My Shop";
+    out.theme = out.theme === "light" ? "light" : "dark";
+    out.nextCode = Math.max(1001, Math.floor(num(out.nextCode, 1001)));
+    return out;
   }
 
   function normalizeSupplier(supplier) {
@@ -207,94 +227,256 @@
     };
   }
 
-  function load() {
-    try {
-      const raw = localStorage.getItem(STORE);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        const base = blank();
-        return {
-          products: Array.isArray(parsed.products) ? parsed.products : base.products,
-          customers: Array.isArray(parsed.customers) ? parsed.customers : base.customers,
-          orders: Array.isArray(parsed.orders) ? parsed.orders : base.orders,
-          expenses: Array.isArray(parsed.expenses) ? parsed.expenses.map(normalizeExpense) : base.expenses,
-          suppliers: Array.isArray(parsed.suppliers) ? parsed.suppliers.map(normalizeSupplier) : base.suppliers,
-          chats: parsed.chats && typeof parsed.chats === "object" ? parsed.chats : base.chats,
-          settings: normalizeSettings(parsed.settings)
-        };
-      }
-      const old = localStorage.getItem(OLD_STORE);
-      if (old) return migrateOld(old);
-    } catch (error) {
-      console.warn("SellMate: could not read saved data", error);
-    }
-    return blank();
-  }
-
-  function migrateOld(raw) {
-    const old = JSON.parse(raw);
+  function normalizeState(raw) {
     const base = blank();
-    const products = (Array.isArray(old.products) ? old.products : []).map((p) => ({
-      id: p.id || uid(), name: p.name || "Item", price: num(p.price), cost: num(p.cost),
-      stock: num(p.stock), low: num(p.low, 3), unit: p.unit || "pc"
-    }));
-    const customers = [];
-    const orders = (Array.isArray(old.orders) ? old.orders : []).map((o, i) => {
-      const phone = o.phone || "";
-      let customer = customers.find((c) => cleanPhone(phone) && cleanPhone(c.phone) === cleanPhone(phone));
-      if (!customer) {
-        customer = { id: uid(), name: o.customer || "Customer", phone, instagram: "", notes: "", createdAt: todayISO() };
-        customers.push(customer);
-      }
-      const product = products.find((p) => p.id === o.productId) ||
-        products.find((p) => p.name.toLowerCase() === String(o.product || "").toLowerCase());
-      const status = o.status || "New";
-      const paid = status === "Delivered" ? num(o.amount) : 0;
-      return {
-        id: o.id || uid(),
-        code: "SM-" + (1001 + i),
-        customerId: customer.id,
-        customerName: o.customer || "Customer",
-        phone,
-        instagram: "",
-        source: "WhatsApp",
-        items: [{
-          productId: product ? product.id : null,
-          name: o.product || "Item",
-          qty: num(o.quantity, 1),
-          price: num(o.amount),
-          cost: num(o.cost)
-        }],
-        discount: 0,
-        delivery: 0,
-        payments: paid > 0 ? [{ id: uid(), amount: paid, method: "Cash", note: "Migrated from older data", date: todayISO() }] : [],
-        status,
-        address: "",
-        notes: "",
-        date: todayISO(),
-        updatedAt: todayISO(),
-        dispatched: ["Dispatched", "Delivered"].includes(status),
-        returned: status === "Returned",
-        cancelled: status === "Cancelled"
-      };
-    });
+    const src = raw && typeof raw === "object" ? raw : {};
     return {
-      products,
-      customers,
-      orders,
-      expenses: Array.isArray(old.expenses) ? old.expenses.map(normalizeExpense) : [],
-      suppliers: [],
-      chats: old.chats && typeof old.chats === "object" ? old.chats : {},
-      settings: normalizeSettings(old.settings)
+      products: Array.isArray(src.products) ? src.products : base.products,
+      customers: Array.isArray(src.customers) ? src.customers : base.customers,
+      orders: Array.isArray(src.orders) ? src.orders : base.orders,
+      expenses: Array.isArray(src.expenses) ? src.expenses.map(normalizeExpense) : base.expenses,
+      suppliers: Array.isArray(src.suppliers) ? src.suppliers.map(normalizeSupplier) : base.suppliers,
+      chats: src.chats && typeof src.chats === "object" ? src.chats : base.chats,
+      settings: normalizeSettings(src.settings)
     };
   }
 
-  function save() {
-    try {
-      localStorage.setItem(STORE, JSON.stringify(state));
-    } catch (error) {
-      toast("Could not save data on this device.", "warn");
+  function setAuthStatus(message, type) {
+    const el = document.getElementById("authStatus");
+    if (!el) return;
+    el.textContent = message || "";
+    el.className = "auth-status" + (type ? " " + type : "");
+  }
+
+  function showAuthScreen() {
+    document.getElementById("authScreen").hidden = false;
+    document.getElementById("appShell").hidden = true;
+  }
+
+  function showAppShell() {
+    document.getElementById("authScreen").hidden = true;
+    document.getElementById("appShell").hidden = false;
+  }
+
+  function authTab(tab) {
+    const login = tab === "login";
+    const signup = tab === "signup";
+    document.getElementById("loginForm").hidden = !login;
+    document.getElementById("signupForm").hidden = !signup;
+    document.getElementById("recoveryForm").hidden = true;
+    document.querySelectorAll("[data-auth-tab]").forEach((b) => b.classList.toggle("active", b.dataset.authTab === tab));
+    setAuthStatus("");
+  }
+
+  function showRecovery(mode, message) {
+    recoveryNeedsOld = mode === "change";
+    const oldField = document.getElementById("recoveryOldField");
+    const oldInput = document.getElementById("recoveryOldPassword");
+    oldField.hidden = !recoveryNeedsOld;
+    oldInput.required = recoveryNeedsOld;
+    oldInput.value = "";
+    document.getElementById("recoveryHelp").textContent = recoveryNeedsOld
+      ? "Enter your current password, then choose a new one."
+      : "Set a new password for your account.";
+    document.getElementById("loginForm").hidden = true;
+    document.getElementById("signupForm").hidden = true;
+    document.getElementById("recoveryForm").hidden = false;
+    document.querySelectorAll("[data-auth-tab]").forEach((b) => b.classList.remove("active"));
+    showAuthScreen();
+    setAuthStatus(message || (recoveryNeedsOld ? "Verify your current password." : "Link verified. Choose a new password."), "ok");
+  }
+
+  function cancelRecovery() {
+    recoveryIntent = false;
+    document.getElementById("recoveryForm").hidden = true;
+    if (currentUser && sb) {
+      showAppShell();
+      applySettings();
+      renderAll();
+    } else {
+      authTab("login");
     }
+  }
+
+  async function ensureProfile(user) {
+    const email = user.email || "";
+    const fallback = email ? email.split("@")[0] : "My Shop";
+    const shopName = (user.user_metadata && user.user_metadata.shop_name) ? String(user.user_metadata.shop_name) : fallback;
+    await sb.from("profiles").upsert({ id: user.id, shop_name: shopName, updated_at: new Date().toISOString() }, { onConflict: "id" });
+  }
+
+  async function loadCloudState(user) {
+    const { data, error } = await sb.from("workspaces").select("data").eq("user_id", user.id).maybeSingle();
+    if (error) throw error;
+    if (data && data.data && Object.keys(data.data).length) {
+      state = normalizeState(data.data);
+      return;
+    }
+    state = blank();
+    const shop = (user.user_metadata && user.user_metadata.shop_name) ? String(user.user_metadata.shop_name) : (user.email ? user.email.split("@")[0] : "My Shop");
+    state.settings.shopName = shop || "My Shop";
+    await persistStateNow();
+  }
+
+  async function persistStateNow() {
+    if (!cloudReady || !currentUser || !sb) return;
+    if (saving) { queuedSave = true; return; }
+    saving = true;
+    try {
+      const payload = { user_id: currentUser.id, data: state, updated_at: new Date().toISOString() };
+      const { error } = await sb.from("workspaces").upsert(payload, { onConflict: "user_id" });
+      if (error) throw error;
+    } catch (error) {
+      console.warn("SellMate cloud save failed", error);
+      toast("Cloud save failed. Check your connection.", "warn");
+    } finally {
+      saving = false;
+      if (queuedSave) { queuedSave = false; persistStateNow(); }
+    }
+  }
+
+  function save() {
+    if (!cloudReady || !currentUser) return;
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => { persistStateNow(); }, 350);
+  }
+
+  async function handleSession(session) {
+    currentUser = session ? session.user : null;
+    cloudReady = !!currentUser;
+    if (!currentUser) {
+      state = blank();
+      showAuthScreen();
+      applySettings();
+      return;
+    }
+    try {
+      await ensureProfile(currentUser);
+      await loadCloudState(currentUser);
+      editingProduct = editingOrder = editingCustomer = null;
+      activePhone = null; paymentOpenId = null; activeLedgerId = null; activeSupplierId = null; editingSupplier = null;
+      parsedPaste = null; selectedPriceIds = null; selectedFollowups = new Set();
+      const emailEl = document.getElementById("accountEmail");
+      if (emailEl) emailEl.textContent = currentUser.email || "Signed in";
+      showAppShell();
+      applySettings();
+      renderProductOptions();
+      renderReplyTemplates();
+      resetOrderForm();
+      renderAll();
+    } catch (error) {
+      console.error(error);
+      setAuthStatus("Could not load your cloud workspace. Check Supabase URL/key and SQL schema.", "warn");
+      showAuthScreen();
+    }
+  }
+
+  async function signInWithPassword(email, password) {
+    setAuthStatus("Signing in...");
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+  }
+
+  async function signUpWithPassword(email, password, shopName) {
+    setAuthStatus("Creating account...");
+    const { data, error } = await sb.auth.signUp({
+      email, password,
+      options: { data: { shop_name: shopName || "My Shop" } }
+    });
+    if (error) throw error;
+    if (data.session) return "signed-in";
+    return "confirm-email";
+  }
+
+  async function signInWithGoogle() {
+    setAuthStatus("Redirecting to Google...");
+    const redirectTo = window.location.origin + window.location.pathname;
+    const { error } = await sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo } });
+    if (error) throw error;
+  }
+
+  async function signOut() {
+    await persistStateNow();
+    await sb.auth.signOut();
+    state = blank();
+    currentUser = null;
+    cloudReady = false;
+    showAuthScreen();
+    applySettings();
+  }
+
+  async function resetPassword(email) {
+    if (!email) throw new Error("Enter your email first.");
+    setAuthStatus("Sending password reset email...");
+    const redirectTo = window.location.origin + window.location.pathname + "?type=recovery";
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo });
+    if (error) throw error;
+  }
+
+  async function updatePassword(password, oldPassword) {
+    if (!password || password.length < 6) throw new Error("New password must be at least 6 characters.");
+    if (oldPassword) {
+      suppressAuthHandling = true;
+      let signInError;
+      try {
+        ({ error: signInError } = await sb.auth.signInWithPassword({ email: currentUser.email, password: oldPassword }));
+      } finally { suppressAuthHandling = false; }
+      if (signInError) throw new Error("Current password is incorrect.");
+    }
+    const { error } = await sb.auth.updateUser({ password });
+    if (error) throw error;
+  }
+
+  async function initCloud() {
+    const cfg = supabaseConfig();
+    if (!cfg) {
+      showAuthScreen();
+      setAuthStatus("Add your Supabase Project URL and anon key in supabase-config.js, then reload.", "warn");
+      applySettings();
+      return;
+    }
+    if (!window.supabase || !window.supabase.createClient) {
+      showAuthScreen();
+      setAuthStatus("Supabase library could not load. Check your internet connection.", "warn");
+      return;
+    }
+
+    const searchParams = new URLSearchParams(window.location.search);
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    recoveryIntent = searchParams.get("type") === "recovery"
+      || hashParams.get("type") === "recovery"
+      || !!searchParams.get("code")
+      || hashParams.has("access_token");
+    const code = searchParams.get("code");
+
+    sb = window.supabase.createClient(cfg.url, cfg.anonKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+    sb.auth.onAuthStateChange((event, session) => {
+      if (suppressAuthHandling) return;
+      if (event === "PASSWORD_RECOVERY" || (recoveryIntent && session)) { showRecovery("reset"); return; }
+      if (recoveryIntent && !session) return;
+      handleSession(session);
+    });
+
+    const { data } = await sb.auth.getSession();
+    if (recoveryIntent) {
+      if (!data.session && code) {
+        const { error } = await sb.auth.exchangeCodeForSession(code);
+        if (error) {
+          showAuthScreen();
+          setAuthStatus("Reset link is invalid or expired. Please request a new one.", "warn");
+          return;
+        }
+      }
+      if (!data.session && !code) {
+        showAuthScreen();
+        setAuthStatus("Reset link is invalid or expired. Please request a new one.", "warn");
+        return;
+      }
+      showRecovery("reset");
+      history.replaceState(null, "", window.location.pathname);
+      return;
+    }
+    await handleSession(data.session);
   }
 
   /* ---------- Derived data ---------- */
@@ -1238,11 +1420,13 @@
     document.documentElement.dataset.theme = light ? "light" : "dark";
     const themeMeta = document.querySelector('meta[name="theme-color"]');
     if (themeMeta) themeMeta.content = light ? "#f6f8f6" : "#121514";
-    document.getElementById("shopName").value = state.settings.shopName || "My Shop";
-    document.getElementById("shopChip").textContent = state.settings.shopName || "My Shop";
+    const shop = state.settings.shopName || "My Shop";
+    document.getElementById("shopName").value = shop;
+    document.getElementById("shopChip").textContent = shop;
+    const acct = document.getElementById("accountName"); if (acct) acct.textContent = shop;
     const hour = new Date().getHours();
     const greet = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
-    document.getElementById("greeting").textContent = greet + ", " + (state.settings.shopName || "seller");
+    document.getElementById("greeting").textContent = greet + ", " + shop;
     document.getElementById("todayLabel").textContent = new Date().toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
   }
 
@@ -2020,6 +2204,61 @@
 
   /* ---------- Events ---------- */
   function bind() {
+    document.querySelectorAll("[data-auth-tab]").forEach((b) => b.addEventListener("click", () => authTab(b.dataset.authTab)));
+    document.getElementById("loginForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById("loginBtn"); btn.disabled = true;
+      try { await signInWithPassword(document.getElementById("loginEmail").value.trim(), document.getElementById("loginPassword").value); setAuthStatus(""); }
+      catch (err) { setAuthStatus(err.message || "Login failed.", "warn"); } finally { btn.disabled = false; }
+    });
+    document.getElementById("signupForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById("signupBtn"); btn.disabled = true;
+      try {
+        const result = await signUpWithPassword(document.getElementById("signupEmail").value.trim(), document.getElementById("signupPassword").value, document.getElementById("signupShop").value.trim());
+        if (result === "confirm-email") setAuthStatus("Account created. Check your email to confirm, then log in.", "ok");
+        else setAuthStatus("");
+      } catch (err) { setAuthStatus(err.message || "Signup failed.", "warn"); } finally { btn.disabled = false; }
+    });
+    document.getElementById("googleAuthBtn").addEventListener("click", async () => { try { await signInWithGoogle(); } catch (err) { setAuthStatus(err.message || "Google sign-in failed.", "warn"); } });
+    document.getElementById("forgotPasswordBtn").addEventListener("click", async () => {
+      const email = document.getElementById("loginEmail").value.trim();
+      try { await resetPassword(email); setAuthStatus("Password reset email sent. Check your inbox/spam.", "ok"); }
+      catch (err) { setAuthStatus(err.message || "Could not send reset email.", "warn"); }
+    });
+    document.getElementById("recoveryForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById("recoveryBtn"); btn.disabled = true;
+      const wasRecovery = recoveryIntent;
+      recoveryIntent = false;
+      try {
+        const oldPassword = recoveryNeedsOld ? document.getElementById("recoveryOldPassword").value : "";
+        await updatePassword(document.getElementById("recoveryPassword").value, oldPassword);
+        setAuthStatus("Password updated. You can now use the app.", "ok");
+        document.getElementById("recoveryForm").reset();
+        if (currentUser && sb) { showAppShell(); applySettings(); renderAll(); }
+      } catch (err) {
+        if (wasRecovery) recoveryIntent = true;
+        setAuthStatus(err.message || "Could not update password.", "warn");
+      } finally { btn.disabled = false; }
+    });
+    document.querySelectorAll("[data-toggle-password]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const input = document.getElementById(btn.dataset.togglePassword);
+        if (!input) return;
+        const show = input.type === "password";
+        input.type = show ? "text" : "password";
+        btn.setAttribute("aria-pressed", show ? "true" : "false");
+        btn.setAttribute("aria-label", show ? "Hide password" : "Show password");
+      });
+    });
+    document.getElementById("changePasswordBtn").addEventListener("click", () => showRecovery("change"));
+    document.getElementById("recoveryCancelBtn").addEventListener("click", cancelRecovery);
+    document.getElementById("logoutBtn").addEventListener("click", async () => {
+      const btn = document.getElementById("logoutBtn"); btn.disabled = true;
+      try { await signOut(); } catch (err) { toast(err.message || "Logout failed.", "warn"); } finally { btn.disabled = false; }
+    });
+
     document.querySelectorAll("[data-view]").forEach((b) => b.addEventListener("click", () => switchView(b.dataset.view)));
     document.querySelectorAll("[data-go]").forEach((b) => b.addEventListener("click", () => switchView(b.dataset.go)));
     document.getElementById("menuBtn").addEventListener("click", () => document.querySelector(".sidebar").classList.toggle("open"));
@@ -2035,7 +2274,7 @@
     document.getElementById("restoreBtn").addEventListener("click", () => document.getElementById("restoreFile").click());
     document.getElementById("restoreFile").addEventListener("change", (e) => e.target.files[0] && importBackup(e.target.files[0]));
     document.getElementById("resetBtn").addEventListener("click", () => {
-      if (!confirm("Reset all SellMate data on this device?")) return;
+      if (!confirm("Reset this workspace? This clears your cloud data for this account.")) return;
       state = blank();
       activePhone = null;
       paymentOpenId = null;
@@ -2052,7 +2291,7 @@
       save();
       applySettings();
       renderAll();
-      toast("Demo data reset.");
+      toast("Workspace reset.");
     });
     document.getElementById("shopName").addEventListener("change", (e) => {
       state.settings.shopName = e.target.value.trim() || "My Shop";
@@ -2481,7 +2720,7 @@
   }
 
   /* ---------- Start ---------- */
-  if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+  if ("serviceWorker" in navigator && (location.protocol === "https:" || location.protocol === "http:")) {
     window.addEventListener("load", () => {
       navigator.serviceWorker.register("./sw.js").catch((error) => console.warn("SellMate: service worker unavailable", error));
     });
@@ -2489,10 +2728,9 @@
 
   bind();
   applySettings();
-  document.getElementById("reportDate").value = todayISO();
-  document.getElementById("insightMonth").value = todayISO().slice(0, 7);
-  renderProductOptions();
-  renderReplyTemplates();
-  resetOrderForm();
-  renderAll();
+  const od = document.getElementById("orderDate"); if (od) od.value = todayISO();
+  const ed = document.getElementById("expenseDate"); if (ed) ed.value = todayISO();
+  const rd = document.getElementById("reportDate"); if (rd) rd.value = todayISO();
+  const im = document.getElementById("insightMonth"); if (im) im.value = todayISO().slice(0, 7);
+  initCloud();
 })();

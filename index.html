@@ -13,9 +13,88 @@
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
   <title>SellMate — Seller Workspace</title>
   <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
-  <div class="app-shell">
+  <section class="auth-screen" id="authScreen" hidden>
+    <div class="auth-card">
+      <div class="auth-brand">
+        <div class="brand-mark">SM</div>
+        <div>
+          <h1>SellMate</h1>
+          <p>Sign in to your shop workspace</p>
+        </div>
+      </div>
+
+      <div class="auth-tabs" role="tablist" aria-label="Authentication">
+        <button class="auth-tab active" type="button" data-auth-tab="login">Log in</button>
+        <button class="auth-tab" type="button" data-auth-tab="signup">Create account</button>
+      </div>
+
+      <form id="loginForm" class="auth-form">
+        <label class="field">Email<input id="loginEmail" type="email" autocomplete="email" required placeholder="you@example.com" /></label>
+        <label class="field">Password
+          <div class="password-wrap">
+            <input id="loginPassword" type="password" autocomplete="current-password" required placeholder="Your password" />
+            <button class="password-eye" type="button" data-toggle-password="loginPassword" aria-label="Show password" aria-pressed="false">
+              <svg class="eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg class="eye-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20C5 20 1 12 1 12a21.8 21.8 0 0 1 5.06-6.06"/><path d="M9.9 4.24A10.54 10.54 0 0 1 12 4c7 0 11 8 11 8a21.83 21.83 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 0 1-4.24-4.24"/><path d="M1 1l22 22"/></svg>
+            </button>
+          </div>
+        </label>
+        <div class="auth-row">
+          <button class="link-btn" type="button" id="forgotPasswordBtn">Forgot password?</button>
+        </div>
+        <button class="btn primary full" type="submit" id="loginBtn">Log in</button>
+      </form>
+
+      <form id="signupForm" class="auth-form" hidden>
+        <label class="field">Shop name<input id="signupShop" type="text" autocomplete="organization" placeholder="e.g. Samad Store" /></label>
+        <label class="field">Email<input id="signupEmail" type="email" autocomplete="email" required placeholder="you@example.com" /></label>
+        <label class="field">Password
+          <div class="password-wrap">
+            <input id="signupPassword" type="password" autocomplete="new-password" minlength="6" required placeholder="At least 6 characters" />
+            <button class="password-eye" type="button" data-toggle-password="signupPassword" aria-label="Show password" aria-pressed="false">
+              <svg class="eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg class="eye-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20C5 20 1 12 1 12a21.8 21.8 0 0 1 5.06-6.06"/><path d="M9.9 4.24A10.54 10.54 0 0 1 12 4c7 0 11 8 11 8a21.83 21.83 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 0 1-4.24-4.24"/><path d="M1 1l22 22"/></svg>
+            </button>
+          </div>
+        </label>
+        <button class="btn primary full" type="submit" id="signupBtn">Create account</button>
+      </form>
+
+      <form id="recoveryForm" class="auth-form" hidden>
+        <p class="auth-note" id="recoveryHelp" style="margin-top:0;margin-bottom:4px;text-align:left;">Set a new password for your account.</p>
+        <label class="field" id="recoveryOldField" hidden>Current password
+          <div class="password-wrap">
+            <input id="recoveryOldPassword" type="password" autocomplete="current-password" placeholder="Your current password" />
+            <button class="password-eye" type="button" data-toggle-password="recoveryOldPassword" aria-label="Show password" aria-pressed="false">
+              <svg class="eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg class="eye-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20C5 20 1 12 1 12a21.8 21.8 0 0 1 5.06-6.06"/><path d="M9.9 4.24A10.54 10.54 0 0 1 12 4c7 0 11 8 11 8a21.83 21.83 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 0 1-4.24-4.24"/><path d="M1 1l22 22"/></svg>
+            </button>
+          </div>
+        </label>
+        <label class="field">New password
+          <div class="password-wrap">
+            <input id="recoveryPassword" type="password" autocomplete="new-password" minlength="6" required placeholder="At least 6 characters" />
+            <button class="password-eye" type="button" data-toggle-password="recoveryPassword" aria-label="Show password" aria-pressed="false">
+              <svg class="eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg class="eye-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20C5 20 1 12 1 12a21.8 21.8 0 0 1 5.06-6.06"/><path d="M9.9 4.24A10.54 10.54 0 0 1 12 4c7 0 11 8 11 8a21.83 21.83 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 0 1-4.24-4.24"/><path d="M1 1l22 22"/></svg>
+            </button>
+          </div>
+        </label>
+        <button class="btn primary full" type="submit" id="recoveryBtn">Update password</button>
+        <button class="btn ghost full" type="button" id="recoveryCancelBtn">Cancel</button>
+      </form>
+
+      <div class="auth-divider"><span>or</span></div>
+      <button class="btn ghost full" type="button" id="googleAuthBtn">Continue with Google</button>
+      <p class="auth-status" id="authStatus" aria-live="polite"></p>
+      <p class="auth-note">Your shop data is private to your account. Fresh cloud workspace for each account.</p>
+    </div>
+  </section>
+
+  <div class="app-shell" id="appShell" hidden>
     <aside class="sidebar" aria-label="Primary navigation">
       <div class="brand">
         <div class="brand-mark">SM</div>
@@ -30,8 +109,14 @@
         <button class="nav-item" data-view="more"><span aria-hidden="true">◉</span> More</button>
       </nav>
       <div class="sidebar-foot">
-        <div class="mode-pill"><span class="mode-dot"></span> Local demo</div>
-        <p>Your data stays on this device.</p>
+        <div class="account-card">
+          <div class="account-meta">
+            <strong id="accountName">My Shop</strong>
+            <span id="accountEmail">Signed in</span>
+          </div>
+          <button class="btn ghost full" id="changePasswordBtn" type="button">Change password</button>
+          <button class="btn ghost full" id="logoutBtn" type="button">Log out</button>
+        </div>
       </div>
     </aside>
 
@@ -318,7 +403,7 @@
                 <p class="backup-meta" id="lastBackupLabel">No backup downloaded yet.</p>
                 <div class="settings-row">
                   <button class="btn ghost" id="restoreBtn">Restore backup</button>
-                  <button class="btn danger-ghost" id="resetBtn">Reset demo data</button>
+                  <button class="btn danger-ghost" id="resetBtn">Reset workspace</button>
                 </div>
                 <input id="restoreFile" type="file" accept="application/json" hidden />
               </section>
@@ -456,6 +541,7 @@
   </nav>
 
   <div class="toast-area" id="toastArea" aria-live="polite"></div>
+  <script src="supabase-config.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
