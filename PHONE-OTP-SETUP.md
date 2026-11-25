@@ -1,6 +1,6 @@
 # SellMate — Phone OTP login (Pakistan, free tier)
 
-Phone login is already built into the app (**Phone OTP** tab). It uses Supabase Auth for the code and **textbee Free** to deliver the SMS from your own paired Android phone, so no Twilio bill is needed.
+Phone login is already built into the app (**Continue with phone** button). It uses Supabase Auth for the code and **textbee Free** to deliver the SMS from your own paired Android phone, so no Twilio bill is needed.
 
 ## Cost
 - Supabase Free: Send SMS hook is available on the Free plan.
@@ -31,7 +31,7 @@ The SQL creates `public.sellmate_send_sms`, enables `pg_net`, and locks the func
 3. Keep the default OTP rate limit (one code every 60 seconds) to avoid abuse.
 
 ## 4. Test
-1. Open https://sellmate-draft.netlify.app and click **Phone OTP**.
+1. Open https://sellmate-draft.netlify.app and click **Continue with phone**.
 2. Enter `03001234567` (or `+923001234567`) and press **Send code**.
 3. The SMS arrives from your paired phone. Enter the 6-digit code and press **Verify & sign in**.
 4. You get your own private cloud workspace, same as email/Google users.
