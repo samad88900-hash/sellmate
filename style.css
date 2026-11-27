@@ -87,6 +87,7 @@ html[data-theme="dark"] {
 [hidden] { display: none !important; }
 html { scroll-behavior: auto; }
 [id] { scroll-margin-top: 124px; }
+html { touch-action: manipulation; }
 
 body {
   min-height: 100vh;
@@ -102,6 +103,7 @@ button, input, select, textarea {
   font: inherit;
   color: inherit;
   min-height: 44px;
+  touch-action: manipulation;
 }
 button { cursor: pointer; }
 ::selection { background: var(--accent-line); }
@@ -112,6 +114,7 @@ button { cursor: pointer; }
 .app-shell[hidden], .auth-screen[hidden] { display: none !important; }
 .bottom-nav { display: none; }
 .app-shell[hidden] ~ .bottom-nav { display: none !important; }
+.nav-backdrop { display: none; }
 
 .sidebar {
   position: fixed;
@@ -726,6 +729,15 @@ html[data-theme="light"] .sidebar { background: var(--bg); }
     padding: 7px 3px; font-size: 10px; text-align: center; justify-content: center;
   }
   .bottom-nav .nav-item span { font-size: 17px; width: auto; }
+  body.nav-open .nav-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    background: rgba(5, 6, 5, .48);
+    animation: fade .2s var(--ease) both;
+  }
+  body.nav-open .help-fab { z-index: 55; }
   .toast-area { bottom: 92px; right: 14px; left: 14px; }
   .toast { max-width: none; }
   .report-grid, .reply-grid { grid-template-columns: 1fr; }

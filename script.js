@@ -253,6 +253,7 @@
   }
 
   function showAuthScreen() {
+    closeSidebar();
     document.getElementById("authScreen").hidden = false;
     document.getElementById("appShell").hidden = true;
   }
@@ -751,10 +752,18 @@ grant execute on function public.delete_account() to authenticated;`;
   }
 
   /* ---------- Navigation ---------- */
+  function setSidebar(open) {
+    const sidebar = document.querySelector(".sidebar");
+    if (!sidebar) return;
+    sidebar.classList.toggle("open", open);
+    document.body.classList.toggle("nav-open", open);
+  }
+  function closeSidebar() { setSidebar(false); }
+
   function switchView(view) {
     document.querySelectorAll(".view").forEach((v) => v.classList.toggle("active", v.id === "view-" + view));
     document.querySelectorAll("[data-view]").forEach((b) => b.classList.toggle("active", b.dataset.view === view));
-    document.querySelector(".sidebar").classList.remove("open");
+    closeSidebar();
     window.scrollTo({ top: 0, behavior: "auto" });
   }
 
@@ -2552,7 +2561,22 @@ function copyInvoice() {
 
     document.querySelectorAll("[data-view]").forEach((b) => b.addEventListener("click", () => switchView(b.dataset.view)));
     document.querySelectorAll("[data-go]").forEach((b) => b.addEventListener("click", () => switchView(b.dataset.go)));
-    document.getElementById("menuBtn").addEventListener("click", () => document.querySelector(".sidebar").classList.toggle("open"));
+    const menuBtn = document.getElementById("menuBtn");
+    const sidebar = document.querySelector(".sidebar");
+    menuBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      setSidebar(!sidebar.classList.contains("open"));
+    });
+    const navBackdrop = document.getElementById("navBackdrop");
+    if (navBackdrop) navBackdrop.addEventListener("click", closeSidebar);
+    document.addEventListener("click", (event) => {
+      if (!sidebar.classList.contains("open")) return;
+      if (sidebar.contains(event.target) || menuBtn.contains(event.target)) return;
+      closeSidebar();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") closeSidebar();
+    });
 
     document.getElementById("themeBtn").addEventListener("click", () => {
       state.settings.theme = document.documentElement.dataset.theme === "light" ? "dark" : "light";
