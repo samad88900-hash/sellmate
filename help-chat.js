@@ -24,10 +24,10 @@
     if (input) input.placeholder = tr("Apna sawal likho…", "Ask your question…");
     if (fab) fab.setAttribute("aria-label", tr("SellMate help kholein", "Open SellMate help"));
     if (panel) panel.setAttribute("aria-label", tr("SellMate madadgar", "SellMate help assistant"));
-    if (panel && open) {
+    if (panel) {
       log.innerHTML = "";
       greeted = false;
-      setOpen(true);
+      if (open) setOpen(true);
     }
   }
 
