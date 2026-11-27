@@ -522,11 +522,11 @@ html[data-theme="light"] .sidebar { background: var(--bg); }
   padding: 28px;
   box-shadow: var(--shadow);
 }
-.auth-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+.auth-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; padding-right: 86px; }
+.auth-lang-toggle { position: absolute; top: 18px; right: 18px; }
 .auth-brand h1 { font-size: 24px; line-height: 1.1; letter-spacing: -.03em; color: var(--navy); }
 .auth-brand p { color: var(--muted); font-size: 13px; margin-top: 2px; }
-.auth-tab-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; margin-bottom: 18px; }
-.auth-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.auth-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 18px; }
 .auth-tab {
   min-height: 42px; border: 1px solid var(--line); border-radius: 11px;
   background: transparent; color: var(--muted); font-size: 12.5px; font-weight: 700;
@@ -563,8 +563,6 @@ html[data-theme="light"] .sidebar { background: var(--bg); }
 .auth-note a { color: var(--accent); text-decoration: none; }
 .auth-note a:hover { text-decoration: underline; }
 .account-card { display: grid; gap: 10px; }
-.sidebar-lang { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.sidebar-lang > span { font-size: 11px; font-weight: 700; color: var(--muted); }
 .account-meta strong { display: block; font-size: 13px; }
 .account-meta span { display: block; font-size: 11px; color: var(--muted); word-break: break-word; }
 .auth-loading { opacity: .65; pointer-events: none; }
