@@ -1,5 +1,5 @@
 /* SellMate service worker — offline cache for the app shell. */
-const CACHE = "sellmate-v56";
+const CACHE = "sellmate-v57";
 const SUPABASE_JS = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js";
 const ASSETS = [
   "./",
@@ -56,6 +56,9 @@ self.addEventListener("fetch", (event) => {
 
   if (request.mode === "navigate") {
     const appShell = url.pathname === "/" || url.pathname.endsWith("/index.html");
+    const privacy = url.pathname.endsWith("/privacy") || url.pathname.endsWith("/privacy.html");
+    const terms = url.pathname.endsWith("/terms") || url.pathname.endsWith("/terms.html");
+    const offlineFile = privacy ? "./privacy.html" : terms ? "./terms.html" : appShell ? "./index.html" : null;
     event.respondWith(
       fetch(request)
         .then((response) => {
@@ -65,7 +68,15 @@ self.addEventListener("fetch", (event) => {
           }
           return response;
         })
-        .catch(() => caches.match(request).then((hit) => hit || caches.match("./index.html")))
+        .catch(async () => {
+          const direct = await caches.match(request);
+          if (direct) return direct;
+          if (offlineFile) {
+            const fallback = await caches.match(offlineFile);
+            if (fallback) return fallback;
+          }
+          return new Response("Offline", { status: 503, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+        })
     );
     return;
   }
