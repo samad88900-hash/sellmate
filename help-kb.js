@@ -223,4 +223,226 @@
     "Payment due kaise dekhein?",
     "Account delete"
   ];
+
+  /* English-only knowledge base. Same ids/actions as Roman Urdu, all text in English. */
+  window.SELLMATE_HELP_KB_EN = [
+    {
+      id: "login",
+      keys: ["login", "log in", "sign in", "email password", "forgot password", "access account"],
+      q: "How do I log in?",
+      a: "Keep the Log in tab selected. Enter your email and password, then tap Log in. If you forgot your password, use Forgot password? to get a reset link.",
+      view: "login"
+    },
+    {
+      id: "signup",
+      keys: ["signup", "sign up", "new account", "create account", "register"],
+      q: "How do I create a new account?",
+      a: "Open the Create account tab. Enter a shop name, email, and a password with at least 6 characters. After email confirmation, return to the app and log in.",
+      view: "signup"
+    },
+    {
+      id: "forgot",
+      keys: ["forgot", "reset password", "forgot password", "reset link", "lost password"],
+      q: "How do I reset my password?",
+      a: "Enter your email on the sign-in screen, then tap Forgot password?. You will receive a reset link by email. Open it and set a new password — your old password is not needed.",
+      view: "login"
+    },
+    {
+      id: "change-password",
+      keys: ["change password", "new password", "current password", "update password"],
+      q: "Where can I change my password?",
+      a: "At the bottom of the sidebar, open your account card and tap Change password. Enter your current password and the new password.",
+      action: "changePassword"
+    },
+    {
+      id: "otp",
+      keys: ["otp", "code", "sms", "phone login", "6 digit", "text not received", "no sms"],
+      q: "I did not receive the OTP code",
+      a: "Enter your Pakistan number as 03001234567. The app converts it to +923001234567. The 6-digit code arrives by SMS in 30–60 seconds. Tap Send code again if needed. The free SMS route sends from a paired phone, so the sender may appear as a personal number.",
+      view: "login"
+    },
+    {
+      id: "otp-typo",
+      keys: ["invalid number", "letter o", "digits only", "wrong number", "number error"],
+      q: "Why is my phone number rejected?",
+      a: "Use digits only. Type zero (0), not the letter O. Example: 03100371974. The app blocks letters.",
+      view: "login"
+    },
+    {
+      id: "google",
+      keys: ["google", "google login", "google sign in", "brand verification"],
+      q: "When will Google sign-in be available?",
+      a: "Google sign-in is currently in testing mode. Public launch requires a custom domain and Google brand verification. For now, use email/password or phone OTP.",
+      view: "login"
+    },
+    {
+      id: "shop-name",
+      keys: ["shop name", "store name", "change name", "business name"],
+      q: "How do I change the shop name?",
+      a: "Go to More → Shop settings and edit the Shop name field. Click outside the field to save. The name updates everywhere.",
+      view: "more"
+    },
+    {
+      id: "add-product",
+      keys: ["product", "item", "catalogue", "sku", "add product", "stock"],
+      q: "How do I add a product?",
+      a: "Open Products and use the Add a product form. Enter SKU, name, sale price, cost price, and stock, then tap Save product. You can also set a low-stock alert.",
+      view: "products"
+    },
+    {
+      id: "edit-product",
+      keys: ["edit product", "price update", "stock update", "delete product"],
+      q: "How do I edit a product or stock?",
+      a: "In the product list, each row has Edit and stock + / Set buttons. Use Edit to change prices and + or Set to update stock.",
+      view: "products"
+    },
+    {
+      id: "low-stock",
+      keys: ["low stock", "stock alert", "available", "reserved", "stock watch"],
+      q: "How do I check low stock?",
+      a: "The Stock watch panel on Home shows low stock. Items are reserved when an order is Confirmed or Packed, and stock is deducted when it is Dispatched.",
+      view: "home"
+    },
+    {
+      id: "new-order",
+      keys: ["order", "new order", "sale", "create order", "bill"],
+      q: "How do I create an order?",
+      a: "Open Orders and tap New order. Enter the customer name and phone, add items, enter the paid amount, then tap Save order. Every order gets its own code.",
+      view: "orders"
+    },
+    {
+      id: "order-status",
+      keys: ["status", "dispatch", "delivered", "cancel order", "return", "tracking"],
+      q: "How do I change an order status?",
+      a: "Each order row has a status dropdown: New → Confirmed → Packed → Dispatched → Delivered. Stock is deducted on Dispatched and restored on cancel or return.",
+      view: "orders"
+    },
+    {
+      id: "payment",
+      keys: ["payment", "due", "pending", "advance", "paid", "balance", "outstanding"],
+      q: "How do I track payments and dues?",
+      a: "Tap Payment on an order row. Add the amount, method, and a note. Due, Advance, and Paid tags appear on every order. Pending payments are also on Home.",
+      view: "orders"
+    },
+    {
+      id: "invoice",
+      keys: ["invoice", "bill", "print", "pdf", "slip", "receipt", "printable"],
+      q: "How do I print an invoice?",
+      a: "In Orders, tap Invoice on the order. A clean invoice opens in a new tab — use Print / Save PDF or Copy text.",
+      view: "orders"
+    },
+    {
+      id: "repeat-order",
+      keys: ["repeat", "same order", "copy order", "reorder"],
+      q: "How do I repeat an old order?",
+      a: "Tap Repeat on an order row. The customer and items are copied from the old order. Make any changes and save.",
+      view: "orders"
+    },
+    {
+      id: "customer",
+      keys: ["customer", "ledger", "statement", "customer history"],
+      q: "How do I manage customers and ledgers?",
+      a: "Add or edit customers in the Customers view. Tap Ledger on a row to see that customer's orders, payments, and running balance.",
+      view: "customers"
+    },
+    {
+      id: "supplier",
+      keys: ["supplier", "payable", "wholesale", "supplier bill", "supplier payment"],
+      q: "How do I record supplier bills?",
+      a: "Go to More → Suppliers. Add a supplier, then open its ledger and tap Add bill or Record payment. The payable amount appears there.",
+      view: "more"
+    },
+    {
+      id: "expense",
+      keys: ["expense", "cost", "rent", "packaging", "spend"],
+      q: "How do I add an expense?",
+      a: "Go to More → Expenses. Add a name, amount, and category. The monthly summary subtracts these expenses from profit.",
+      view: "more"
+    },
+    {
+      id: "backup",
+      keys: ["backup", "download", "export", "json", "save data"],
+      q: "How do I download a backup?",
+      a: "Use the download icon (⇩) at the top right, or go to More → Shop settings near Restore backup. Your whole dataset downloads as a JSON file.",
+      action: "backup"
+    },
+    {
+      id: "restore",
+      keys: ["restore", "import", "recover data", "upload backup"],
+      q: "How do I restore a backup?",
+      a: "Go to More → Shop settings → Restore backup. Select your SellMate JSON file. Confirming replaces the current data with the backup.",
+      view: "more"
+    },
+    {
+      id: "reset",
+      keys: ["reset", "clear data", "workspace reset", "erase data"],
+      q: "What does Reset workspace do?",
+      a: "Go to More → Shop settings → Reset workspace. This clears all cloud data for this account. Download a backup first.",
+      view: "more"
+    },
+    {
+      id: "delete-account",
+      keys: ["delete account", "account delete", "remove account", "close account"],
+      q: "How do I delete my account?",
+      a: "In the sidebar account card, tap Delete account. After confirmation, the account, workspaces, and profile are permanently deleted.",
+      action: "deleteAccount"
+    },
+    {
+      id: "csv",
+      keys: ["csv", "excel", "export", "accounting", "tax"],
+      q: "Where is CSV export?",
+      a: "Go to More → CSV export. You get separate CSV files for Orders, Payments, Customers, Products, and Suppliers.",
+      view: "more"
+    },
+    {
+      id: "profit",
+      keys: ["profit", "monthly", "summary", "sales report", "top sellers"],
+      q: "How do I see monthly profit?",
+      a: "Go to More → Top sellers & monthly summary. Choose a month and tap Generate to see sales, cost, expenses, net profit, and top items.",
+      view: "more"
+    },
+    {
+      id: "chat-studio",
+      keys: ["chat studio", "draft", "whatsapp reply", "instagram dm", "message template"],
+      q: "What is Chat Studio?",
+      a: "Chat Studio has ready-made drafts based on your orders: availability, quote, confirm, reminder, dispatch, and delivered. Copy and paste them into WhatsApp or Instagram.",
+      view: "chat"
+    },
+    {
+      id: "theme",
+      keys: ["theme", "dark", "light", "color", "dark mode"],
+      q: "How do I turn on dark mode?",
+      a: "Tap the half-moon icon (◐) at the top right. The app always opens in light mode; dark mode is saved only if you choose it.",
+      action: "theme"
+    },
+    {
+      id: "offline",
+      keys: ["offline", "internet", "cache", "slow", "cloud save failed"],
+      q: "Does the app work offline?",
+      a: "The interface opens from the offline cache, but data is saved in the cloud. Internet is needed to save. If Cloud save failed appears, check your connection.",
+      view: "home"
+    },
+    {
+      id: "mobile",
+      keys: ["mobile", "bottom nav", "menu", "sidebar", "navigation"],
+      q: "Where is navigation on mobile?",
+      a: "On mobile, use the bottom nav: Home, Products, Orders, Customers, and Chat. The ☰ button also opens the sidebar.",
+      view: "home"
+    },
+    {
+      id: "support",
+      keys: ["support", "help", "contact", "email", "issue", "problem"],
+      q: "I still need help",
+      a: "If this answer did not help, email samad88900@gmail.com. Include the screen name and the steps that caused the issue.",
+      action: "support"
+    }
+  ];
+
+  window.SELLMATE_HELP_CHIPS_EN = [
+    "How do I print an invoice?",
+    "OTP code not received",
+    "How do I download a backup?",
+    "How do I see payment due?",
+    "Delete my account"
+  ];
 })();

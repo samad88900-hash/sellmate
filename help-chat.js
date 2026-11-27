@@ -2,10 +2,34 @@
 (function () {
   "use strict";
 
-  const KB = window.SELLMATE_HELP_KB || [];
-  const CHIPS = window.SELLMATE_HELP_CHIPS || [];
+  const UR_KB = window.SELLMATE_HELP_KB || [];
+  const EN_KB = window.SELLMATE_HELP_KB_EN || [];
+  const UR_CHIPS = window.SELLMATE_HELP_CHIPS || [];
+  const EN_CHIPS = window.SELLMATE_HELP_CHIPS_EN || [];
+  const LANG = window.SellMateLang || null;
   const BRIDGE = window.SellMateHelp || {};
   const SUPPORT_EMAIL = "samad88900@gmail.com";
+
+  let KB = UR_KB;
+  let CHIPS = UR_CHIPS;
+
+  function tr(ur, en) {
+    return LANG && LANG.isEnglish() ? en : ur;
+  }
+
+  function applyLanguage() {
+    const english = !!(LANG && LANG.isEnglish());
+    KB = english ? EN_KB : UR_KB;
+    CHIPS = english ? EN_CHIPS : UR_CHIPS;
+    if (input) input.placeholder = tr("Apna sawal likho…", "Ask your question…");
+    if (fab) fab.setAttribute("aria-label", tr("SellMate help kholein", "Open SellMate help"));
+    if (panel) panel.setAttribute("aria-label", tr("SellMate madadgar", "SellMate help assistant"));
+    if (panel && open) {
+      log.innerHTML = "";
+      greeted = false;
+      setOpen(true);
+    }
+  }
 
   let fab = null;
   let panel = null;
@@ -125,10 +149,13 @@
       feedback.className = "help-feedback";
       feedback.innerHTML = '<button type="button" data-help-yes aria-label="Helpful">👍</button><button type="button" data-help-no aria-label="Not helpful">👎</button>';
       feedback.querySelector("[data-help-yes]").addEventListener("click", () => {
-        feedback.textContent = "Thanks for the feedback!";
+        feedback.textContent = tr("Thanks for the feedback!", "Thanks for the feedback!");
       });
       feedback.querySelector("[data-help-no]").addEventListener("click", () => {
-        feedback.innerHTML = "Sorry about that. Try another question or email " + esc(SUPPORT_EMAIL) + ".";
+        feedback.innerHTML = tr(
+          "Sorry about that. Try another question or email " + esc(SUPPORT_EMAIL) + ".",
+          "Sorry about that. Try another question or email " + esc(SUPPORT_EMAIL) + "."
+        );
       });
       bubble.appendChild(feedback);
     }
@@ -164,7 +191,7 @@
     } else if (entry.view && typeof BRIDGE.openView === "function" && document.getElementById("appShell") && !document.getElementById("appShell").hidden) {
       BRIDGE.openView(entry.view);
     } else {
-      addMessage("bot", "Ye step auth screen par hai — pehle login ya account bana lo.", null);
+      addMessage("bot", tr("Ye step auth screen par hai — pehle login ya account bana lo.", "This step is on the sign-in screen — please log in or create an account first."), null);
     }
   }
 
@@ -201,7 +228,10 @@
       if (match) {
         addMessage("bot", match.entry.a, match.entry);
       } else {
-        addMessage("bot", "Maaf karo, ye sawal main abhi samajh nahi paya. Neeche se kisi topic ko choose karo ya " + SUPPORT_EMAIL + " par email kar do.", null);
+        addMessage("bot", tr(
+          "Maaf karo, ye sawal main abhi samajh nahi paya. Neeche se kisi topic ko choose karo ya " + SUPPORT_EMAIL + " par email kar do.",
+          "Sorry, I did not understand that question. Choose a topic below or email " + SUPPORT_EMAIL + "."
+        ), null);
         const old = panel.querySelector(".help-chips");
         if (old) old.remove();
         showChips();
@@ -214,7 +244,10 @@
       home: "Home", products: "Products", orders: "Orders", customers: "Customers", chat: "Chat Studio", more: "More"
     };
     const where = names[currentView()] || "Home";
-    return "Assalam o alaikum! Main SellMate assistant hoon. Tum abhi " + where + " par ho. Koi feature samajhna ho ya issue aa raha ho to poochho — main step-by-step batata hoon.";
+    return tr(
+      "Assalam o alaikum! Main SellMate assistant hoon. Tum abhi " + where + " par ho. Koi feature samajhna ho ya issue aa raha ho to poochho — main step-by-step batata hoon.",
+      "Hello! I am the SellMate assistant. You are currently on " + where + ". Ask me about any feature or issue and I will guide you step by step."
+    );
   }
 
   function setOpen(next) {
@@ -251,7 +284,7 @@
       </header>
       <div class="help-log" aria-live="polite"></div>
       <form class="help-form">
-        <input type="text" placeholder="Apna sawal likho…" aria-label="Ask a question" autocomplete="off" />
+        <input type="text" placeholder="${tr("Apna sawal likho…", "Ask your question…")}" aria-label="Ask a question" autocomplete="off" />
         <button type="submit" aria-label="Send">➤</button>
       </form>`;
 
@@ -274,4 +307,7 @@
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", build);
   else build();
+
+  if (LANG) LANG.onChange(applyLanguage);
+  applyLanguage();
 })();

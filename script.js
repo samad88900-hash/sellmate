@@ -26,7 +26,7 @@
     suppliers: [],
     chats: {},
     settings: {
-      shopName: "My Shop", theme: "light", nextCode: 1001,
+      shopName: "My Shop", theme: "light", language: "ur", nextCode: 1001,
       lastBackupAt: null, backupSnoozedAt: null, replies: {}
     }
   });
@@ -47,6 +47,10 @@
   let editingCustomer = null;
   let activePhone = null;
   let currentDraft = "";
+
+  function uiText(ur, en) {
+    return window.SellMateLang && window.SellMateLang.isEnglish() ? en : ur;
+  }
   let currentTemplate = "";
   let paymentOpenId = null;
   let activeLedgerId = null;
@@ -198,6 +202,7 @@
     const out = Object.assign(base, saved || {}, { replies });
     out.shopName = String(out.shopName || "My Shop").trim() || "My Shop";
     out.theme = out.theme === "dark" ? "dark" : "light";
+    out.language = out.language === "en" ? "en" : "ur";
     out.nextCode = Math.max(1001, Math.floor(num(out.nextCode, 1001)));
     return out;
   }
@@ -365,6 +370,13 @@
     try {
       await ensureProfile(currentUser);
       await loadCloudState(currentUser);
+      const lang = window.SellMateLang;
+      if (lang) {
+        const cloudLang = state.settings.language;
+        if (!lang.hasPreference() && (cloudLang === "en" || cloudLang === "ur")) lang.set(cloudLang, false);
+        state.settings.language = lang.get();
+        save();
+      }
       editingProduct = editingOrder = editingCustomer = null;
       activePhone = null; paymentOpenId = null; activeLedgerId = null; activeSupplierId = null; editingSupplier = null;
       parsedPaste = null; selectedPriceIds = null; selectedFollowups = new Set();
@@ -488,11 +500,14 @@ grant execute on function public.delete_account() to authenticated;`;
 
   function showDeleteSetup() {
     if (document.querySelector(".setup-modal")) return;
+    const english = !!(window.SellMateLang && window.SellMateLang.isEnglish());
     const box = document.createElement("div");
     box.className = "setup-modal";
     box.innerHTML = `<div class="setup-card">
       <h3>One-time owner setup</h3>
-      <p>Ye sirf app owner ke liye hai. <strong>Ek dafa</strong> ye SQL <strong>Supabase → SQL Editor → New query → Run</strong> kar do. Uske baad kisi bhi user ko ye screen nahi dikhegi — sab sirf button dabayenge.</p>
+      <p>${english
+        ? "This is for the app owner only. Run this SQL <strong>once</strong> in <strong>Supabase → SQL Editor → New query → Run</strong>. After that, no user will see this screen — they only tap the button."
+        : "Ye sirf app owner ke liye hai. <strong>Ek dafa</strong> ye SQL <strong>Supabase → SQL Editor → New query → Run</strong> kar do. Uske baad kisi bhi user ko ye screen nahi dikhegi — sab sirf button dabayenge."}</p>
       <textarea readonly spellcheck="false">${esc(DELETE_ACCOUNT_SQL)}</textarea>
       <div class="row-actions">
         <button class="btn primary" type="button" data-copy-setup>Copy SQL</button>
@@ -1177,10 +1192,19 @@ grant execute on function public.delete_account() to authenticated;`;
       const first = order && order.items[0];
       const product = first && state.products.find((p) => p.id === first.productId);
       const available = product ? availability(product) : null;
-      if (available === null) return `Assalam o alaikum ${name}! Yes, ${itemList} is available. Shall I book it for you?`;
+      if (available === null) return uiText(
+        `Assalam o alaikum ${name}! Yes, ${itemList} is available. Shall I book it for you?`,
+        `Hello ${name}! Yes, ${itemList} is available. Shall I book it for you?`
+      );
       return available > 0
-        ? `Assalam o alaikum ${name}! Yes, ${product.name} is available — ${available} ${product.unit || "pc"} in stock right now. Shall I book one for you?`
-        : `Assalam o alaikum ${name}! Sorry, ${product.name} is currently out of stock. Shall I message you when it arrives?`;
+        ? uiText(
+          `Assalam o alaikum ${name}! Yes, ${product.name} is available — ${available} ${product.unit || "pc"} in stock right now. Shall I book one for you?`,
+          `Hello ${name}! Yes, ${product.name} is available — ${available} ${product.unit || "pc"} in stock right now. Shall I book one for you?`
+        )
+        : uiText(
+          `Assalam o alaikum ${name}! Sorry, ${product.name} is currently out of stock. Shall I message you when it arrives?`,
+          `Hello ${name}! Sorry, ${product.name} is currently out of stock. Shall I message you when it arrives?`
+        );
     }
     if (kind === "quote") {
       return `Hi ${name}, your quote: ${itemList}. Total ${total}${order && num(order.delivery) ? " (including delivery " + money(order.delivery) + ")" : ""}${order && num(order.discount) ? ", discount " + money(order.discount) : ""}. Let me know if you'd like to confirm.`;
@@ -1190,13 +1214,19 @@ grant execute on function public.delete_account() to authenticated;`;
       return `Hi ${name}, your order ${order ? order.code : ""} is confirmed: ${itemList}. Total ${total}. Paid ${order ? money(orderPaid(order)) : money(0)}.${balanceLine}${dateLine} Thank you!`;
     }
     if (kind === "reminder") {
-      return `Assalam o alaikum ${name}, a friendly reminder for order ${order ? order.code : ""}:${dueLine} ${balanceLine} You can pay by cash, Easypaisa, JazzCash or bank transfer. JazakAllah khair!`;
+      return uiText(
+        `Assalam o alaikum ${name}, a friendly reminder for order ${order ? order.code : ""}:${dueLine} ${balanceLine} You can pay by cash, Easypaisa, JazzCash or bank transfer. JazakAllah khair!`,
+        `Hello ${name}, a friendly reminder for order ${order ? order.code : ""}:${dueLine} ${balanceLine} You can pay by cash, Easypaisa, JazzCash or bank transfer. Thank you!`
+      );
     }
     if (kind === "dispatch") {
       return `Hi ${name}, your order ${order ? order.code : ""} (${itemList}) has been dispatched.${shipLine} Total ${total}.${balanceLine} I'll share the delivery update soon.`;
     }
     if (kind === "delivered") {
-      return `Assalam o alaikum ${name}, your order ${order ? order.code : ""} has been delivered. JazakAllah khair for shopping with us!${balanceLine}`;
+      return uiText(
+        `Assalam o alaikum ${name}, your order ${order ? order.code : ""} has been delivered. JazakAllah khair for shopping with us!${balanceLine}`,
+        `Hello ${name}, your order ${order ? order.code : ""} has been delivered. Thank you for shopping with us!${balanceLine}`
+      );
     }
     if (kind === "followup") {
       return `Hi ${name}, hope you're well! We have new stock available. Would you like me to share the latest list and prices?`;
@@ -1373,7 +1403,10 @@ grant execute on function public.delete_account() to authenticated;`;
       if (!state.chats[phone] || !state.chats[phone].length) {
         state.chats[phone] = [{
           from: "buyer",
-          text: `Assalam o alaikum! I'd like to know more about ${items.map((i) => i.name).join(", ")}. Is it available?`,
+          text: uiText(
+            `Assalam o alaikum! I'd like to know more about ${items.map((i) => i.name).join(", ")}. Is it available?`,
+            `Hello! I'd like to know more about ${items.map((i) => i.name).join(", ")}. Is it available?`
+          ),
           time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
         }];
       }
@@ -1694,7 +1727,33 @@ function copyInvoice() {
     reader.readAsText(file);
   }
 
+  function syncLanguageControls() {
+    const lang = window.SellMateLang ? window.SellMateLang.get() : "ur";
+    const english = lang === "en";
+    document.querySelectorAll("[data-lang-select]").forEach((select) => { select.value = lang; });
+    const placeholders = {
+      pName: ["e.g. Blue kurta", "e.g. Blue shirt"],
+      pasteText: [
+        "e.g. Assalam o alaikum, I need 2 Blue kurta and 1 Black kurta. My number is 923001234567",
+        "e.g. Hello, I need 2 Blue shirts and 1 Black shirt. My number is 923001234567"
+      ],
+      replyPasteText: [
+        "e.g. Is the blue kurta available? What is the price?",
+        "e.g. Is the blue shirt available? What is the price?"
+      ]
+    };
+    Object.entries(placeholders).forEach(([id, pair]) => {
+      const el = document.getElementById(id);
+      if (el) el.placeholder = english ? pair[1] : pair[0];
+    });
+    if (state.settings.language !== lang) {
+      state.settings.language = lang;
+      save();
+    }
+  }
+
   function applySettings() {
+    syncLanguageControls();
     const light = state.settings.theme === "light";
     document.documentElement.dataset.theme = light ? "light" : "dark";
     const themeMeta = document.querySelector('meta[name="theme-color"]');
@@ -1998,7 +2057,10 @@ function copyInvoice() {
         </div>
         <div class="row-sub ledger-running">Running balance: ${money(e.balance)}</div>
       </div>
-    `).join("") : '<div class="empty-state">No ledger entries yet. Save an order for this customer to start the khata.</div>';
+    `).join("") : `<div class="empty-state">${uiText(
+      "No ledger entries yet. Save an order for this customer to start the khata.",
+      "No ledger entries yet. Save an order for this customer to start the ledger."
+    )}</div>`;
     panel.hidden = false;
   }
 
@@ -2178,7 +2240,7 @@ function copyInvoice() {
     document.getElementById("supplierBillAmount").value = "";
     document.getElementById("supplierBillNote").value = "";
     renderAll();
-    toast("Bill added to supplier khata.");
+    toast(uiText("Bill added to supplier khata.", "Bill added to supplier ledger."));
   }
 
   function addSupplierPayment() {
@@ -2199,13 +2261,16 @@ function copyInvoice() {
     document.getElementById("supplierPayAmount").value = "";
     document.getElementById("supplierPayNote").value = "";
     renderAll();
-    toast("Payment recorded in supplier khata.");
+    toast(uiText("Payment recorded in supplier khata.", "Payment recorded in supplier ledger."));
   }
 
   function deleteSupplier() {
     const supplier = activeSupplierId ? state.suppliers.find((s) => s.id === activeSupplierId) : null;
     if (!supplier) return;
-    if (!confirm("Delete " + supplier.name + " and their khata entries?")) return;
+    if (!confirm(uiText(
+      "Delete " + supplier.name + " and their khata entries?",
+      "Delete " + supplier.name + " and their ledger entries?"
+    ))) return;
     state.suppliers = state.suppliers.filter((s) => s.id !== supplier.id);
     if (editingSupplier === supplier.id) resetSupplierForm();
     activeSupplierId = null;
@@ -2577,6 +2642,14 @@ function copyInvoice() {
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape") closeSidebar();
     });
+
+    document.querySelectorAll("[data-lang-select]").forEach((select) => {
+      select.addEventListener("change", (event) => {
+        if (window.SellMateLang) window.SellMateLang.set(event.target.value);
+        syncLanguageControls();
+      });
+    });
+    if (window.SellMateLang) window.SellMateLang.onChange(syncLanguageControls);
 
     document.getElementById("themeBtn").addEventListener("click", () => {
       state.settings.theme = document.documentElement.dataset.theme === "light" ? "dark" : "light";
