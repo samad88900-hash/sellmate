@@ -9,9 +9,13 @@ Phone login is already built into the app (**Continue with phone** button). It u
 
 ## 1. textbee (your phone becomes the SMS sender)
 1. Sign up at https://textbee.dev/ (free plan).
-2. Install the textbee Android app on a phone with an active Pakistan SIM.
-3. Pair that phone with your textbee account and keep it online + charging.
-4. In the textbee dashboard, create an **API key** just for this project.
+2. On the Android phone, open **https://textbee.dev/download** and install the official **APK**.  
+   - The official textbee app is **not on Google Play**.  
+   - Ignore Play Store apps named **“TextBee: Send SMS Bangladesh”** or **“TextBee – Ad Powered SMS”** (`com.amatullah.textbee`) — they are unrelated ad-based apps and will not connect to your textbee dashboard.  
+   - If Play Protect warns “App not scanned”, tap **More details → Install anyway** only when the APK came from `textbee.dev` or `github.com/textbee/textbee/releases`.
+3. Open the app and scan the QR code shown by **Add device** in your textbee dashboard. Use a phone with an active Pakistan SIM.
+4. In the app, open **Settings → Device Health** and make sure every row is green (SMS permissions, notifications, battery usage Unrestricted, sticky notification On, battery saver Off). Keep the phone online + charging.
+5. In the textbee dashboard, create an **API key** just for this project.
 
 ## 2. Supabase SQL (one time)
 1. Open `supabase-sms-hook.sql` in this repo.
@@ -23,11 +27,12 @@ The SQL creates `public.sellmate_send_sms`, enables `pg_net`, and locks the func
 ## 3. Supabase Auth settings
 1. **Authentication → Providers → Phone** → enable it.
    - Keep automatic phone confirmation **off**, so a code is actually sent.
+   - The dashboard may show Twilio by default and still require its fields even with a Send SMS hook. In that case, first **disable the hook**, enter dummy-but-format-valid values (Account SID `AC` + 32 chars, Auth Token any string, Message Service SID `MG` + 32 chars), enable Phone and **Save**, then re-enable the hook. No real Twilio account is needed; the hook bypasses it at runtime.
 2. **Authentication → Hooks → Add hook**
    - Hook: **Send SMS**
    - Type: **Postgres Function**
    - Function: `public.sellmate_send_sms`
-   - Save.
+   - Save / enable the hook toggle.
 3. Keep the default OTP rate limit (one code every 60 seconds) to avoid abuse.
 
 ## 4. Test
@@ -38,7 +43,7 @@ The SQL creates `public.sellmate_send_sms`, enables `pg_net`, and locks the func
 
 ## iPhone users
 - Logging in from an iPhone is fully supported. The customer's phone can be Android or iPhone — only the SMS text is entered.
-- The SMS is formatted for iPhone/Safari AutoFill: the last line is `@sellmate-draft.netlify.app #123456`, so Safari can suggest the code automatically in the OTP field.
+- The SMS is kept short and plain (`SellMate code: 123456. Do not share this code.`) so carriers are less likely to filter it as spam. Type the 6 digits into the OTP field manually.
 - For the app as a home-screen icon on iPhone: open the site in **Safari** → **Share** → **Add to Home Screen**.
 - The only Android requirement is the **sender/gateway** phone paired with textbee. An iPhone cannot be used as that sender; it can only receive the code.
 

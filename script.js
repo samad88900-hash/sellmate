@@ -26,7 +26,7 @@
     suppliers: [],
     chats: {},
     settings: {
-      shopName: "My Shop", theme: "dark", nextCode: 1001,
+      shopName: "My Shop", theme: "light", nextCode: 1001,
       lastBackupAt: null, backupSnoozedAt: null, replies: {}
     }
   });
@@ -197,7 +197,7 @@
     const replies = saved && saved.replies && typeof saved.replies === "object" ? saved.replies : {};
     const out = Object.assign(base, saved || {}, { replies });
     out.shopName = String(out.shopName || "My Shop").trim() || "My Shop";
-    out.theme = out.theme === "light" ? "light" : "dark";
+    out.theme = out.theme === "dark" ? "dark" : "light";
     out.nextCode = Math.max(1001, Math.floor(num(out.nextCode, 1001)));
     return out;
   }
@@ -243,10 +243,13 @@
   }
 
   function setAuthStatus(message, type) {
-    const el = document.getElementById("authStatus");
-    if (!el) return;
-    el.textContent = message || "";
-    el.className = "auth-status" + (type ? " " + type : "");
+    const text = message || "";
+    const cls = "auth-status" + (type ? " " + type : "");
+    [document.getElementById("authStatus"), document.getElementById("phoneStatus")].forEach((el) => {
+      if (!el) return;
+      el.textContent = text;
+      el.className = cls + (el.id === "phoneStatus" ? " phone-status" : "");
+    });
   }
 
   function showAuthScreen() {
@@ -405,6 +408,7 @@
 
   function normalizePhone(raw) {
     const trimmed = String(raw || "").trim();
+    if (/[A-Za-z]/.test(trimmed)) return null;
     const cleaned = trimmed.replace(/[\s\-()]/g, "");
     if (cleaned.startsWith("+")) return /^\+[0-9]{8,15}$/.test(cleaned) ? cleaned : null;
     let digits = cleaned.replace(/\D/g, "");
@@ -417,7 +421,7 @@
 
   async function sendPhoneCode() {
     const phone = normalizePhone(document.getElementById("phoneNumber").value);
-    if (!phone) throw new Error("Enter a valid mobile number, e.g. 03001234567.");
+    if (!phone) throw new Error("Use digits only (0, not O), e.g. 03001234567.");
     const shopName = document.getElementById("phoneShop").value.trim();
     setAuthStatus("Sending SMS code...");
     const { error } = await sb.auth.signInWithOtp({
@@ -448,6 +452,29 @@
     cloudReady = false;
     showAuthScreen();
     applySettings();
+  }
+
+  async function deleteAccount() {
+    if (!confirm("Delete your account and ALL cloud data? This cannot be undone.")) return;
+    const btn = document.getElementById("deleteAccountBtn");
+    if (btn) btn.disabled = true;
+    suppressAuthHandling = true;
+    try {
+      const { error } = await sb.rpc("delete_account");
+      if (error) throw error;
+      await sb.auth.signOut();
+      state = blank();
+      currentUser = null;
+      cloudReady = false;
+      showAuthScreen();
+      applySettings();
+      setAuthStatus("Account and all data deleted.", "ok");
+    } catch (err) {
+      toast(err.message || "Could not delete account. Run DELETE-ACCOUNT.sql in Supabase first.", "warn");
+    } finally {
+      suppressAuthHandling = false;
+      if (btn) btn.disabled = false;
+    }
   }
 
   async function resetPassword(email) {
@@ -934,6 +961,7 @@
             <button class="btn ghost" data-payment-toggle="${o.id}">Payment</button>
             <button class="btn ghost" data-order-repeat="${esc(o.id)}">Repeat</button>
             <button class="btn ghost" data-order-edit="${o.id}">Edit</button>
+            <button class="btn ghost" data-invoice="${esc(o.id)}">Invoice</button>
             <button class="btn ghost" data-message-order="${esc(o.phone)}">Message</button>
             <a href="https://wa.me/${cleanPhone(o.phone)}?text=${encodeURIComponent("Hello " + o.customerName + ", update on order " + o.code + ".")}" target="_blank" rel="noopener">WhatsApp</a>
             <button class="btn danger-ghost" data-order-delete="${o.id}">Delete</button>
@@ -1379,6 +1407,120 @@
     toast(amount > before && before >= 0 ? "Advance recorded." : "Payment recorded.");
   }
 
+  function invoiceText(order) {
+    const lines = [
+      (state.settings.shopName || "My Shop").toUpperCase(),
+      "Order: " + (order.code || "—") + "   Date: " + prettyDate(order.date),
+      "Customer: " + (order.customerName || "Customer"),
+      order.phone ? "Phone: " + order.phone : "",
+      order.address ? "Address: " + order.address : "",
+      "",
+      "Items"
+    ];
+    (order.items || []).forEach((i) => {
+      lines.push(num(i.qty) + " × " + i.name + " @ " + money(i.price) + " = " + money(num(i.qty) * num(i.price)));
+    });
+    lines.push(
+      "",
+      "Subtotal: " + money(orderSubtotal(order)),
+      "Discount: " + money(order.discount),
+      "Delivery: " + money(order.delivery),
+      "Total: " + money(orderTotal(order)),
+      "Paid: " + money(orderPaid(order)),
+      "Balance: " + money(orderBalance(order)),
+      "Status: " + (order.status || "New")
+    );
+    if (order.notes) lines.push("", "Notes: " + order.notes);
+    lines.push("", "Thank you for shopping with us!");
+    return lines.filter((line) => line !== null && line !== undefined).join("\n");
+  }
+
+  function openInvoice(id) {
+    const order = state.orders.find((o) => o.id === id);
+    if (!order) return;
+    const itemRows = (order.items || []).map((i) => `
+      <tr>
+        <td>${esc(i.name)}${i.sku ? " <small>" + esc(i.sku) + "</small>" : ""}</td>
+        <td class="num">${num(i.qty)}</td>
+        <td class="num">${esc(money(i.price))}</td>
+        <td class="num">${esc(money(num(i.qty) * num(i.price)))}</td>
+      </tr>
+    `).join("");
+    const html = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8" /><title>Invoice ${esc(order.code || "")}</title>
+<style>
+  body { font: 14px/1.5 Arial, sans-serif; color: #27313b; margin: 0; padding: 28px; background: #fff; }
+  .sheet { max-width: 720px; margin: 0 auto; }
+  h1 { margin: 0 0 4px; font-size: 22px; color: #146b52; }
+  h2 { margin: 0 0 18px; font-size: 15px; font-weight: 400; color: #6b6f68; }
+  .meta { display: flex; justify-content: space-between; gap: 20px; margin-bottom: 20px; }
+  .meta div { flex: 1; }
+  .meta small { display: block; color: #6b6f68; }
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; }
+  th, td { padding: 9px 8px; border-bottom: 1px solid #e6e1d6; text-align: left; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #6b6f68; }
+  td.num, th.num { text-align: right; }
+  .totals { margin-left: auto; width: 280px; }
+  .totals div { display: flex; justify-content: space-between; padding: 4px 0; }
+  .totals .grand { font-weight: 700; font-size: 17px; border-top: 2px solid #27313b; margin-top: 6px; padding-top: 9px; }
+  .note { margin-top: 22px; color: #6b6f68; }
+  .no-print { max-width: 720px; margin: 0 auto 18px; display: flex; gap: 8px; }
+  button { font: inherit; padding: 9px 14px; border: 1px solid #146b52; border-radius: 8px; background: #146b52; color: #fff; cursor: pointer; }
+  button.ghost { background: #fff; color: #146b52; }
+  textarea { display: none; }
+  @media print { .no-print { display: none; } body { padding: 0; } }
+</style></head><body>
+<div class="no-print">
+  <button onclick="window.print()">Print / Save PDF</button>
+  <button class="ghost" onclick="copyInvoice()">Copy text</button>
+  <button class="ghost" onclick="window.close()">Close</button>
+</div>
+<div class="sheet">
+  <h1>${esc(state.settings.shopName || "My Shop")}</h1>
+  <h2>SellMate invoice</h2>
+  <div class="meta">
+    <div><small>Order</small><strong>${esc(order.code || "—")}</strong></div>
+    <div><small>Date</small><strong>${esc(prettyDate(order.date))}</strong></div>
+    <div><small>Status</small><strong>${esc(order.status || "New")}</strong></div>
+  </div>
+  <div class="meta">
+    <div><small>Customer</small><strong>${esc(order.customerName || "Customer")}</strong></div>
+    <div><small>Phone</small><strong>${esc(order.phone || "—")}</strong></div>
+  </div>
+  ${order.address ? '<p><small>Address</small><br />' + esc(order.address) + '</p>' : ""}
+  <table><thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Amount</th></tr></thead>
+  <tbody>${itemRows || '<tr><td colspan="4">No items.</td></tr>'}</tbody></table>
+  <div class="totals">
+    <div><span>Subtotal</span><span>${esc(money(orderSubtotal(order)))}</span></div>
+    <div><span>Discount</span><span>${esc(money(order.discount))}</span></div>
+    <div><span>Delivery</span><span>${esc(money(order.delivery))}</span></div>
+    <div class="grand"><span>Total</span><span>${esc(money(orderTotal(order)))}</span></div>
+    <div><span>Paid</span><span>${esc(money(orderPaid(order)))}</span></div>
+    <div><span>Balance</span><span>${esc(money(orderBalance(order)))}</span></div>
+  </div>
+  ${order.notes ? '<p class="note"><strong>Notes:</strong> ' + esc(order.notes) + '</p>' : ""}
+  <p class="note">Thank you for shopping with us!</p>
+</div>
+<textarea id="invoiceText">${esc(invoiceText(order))}</textarea>
+<script>
+function copyInvoice() {
+  var t = document.getElementById('invoiceText');
+  try {
+    navigator.clipboard.writeText(t.value).then(function () { alert('Invoice text copied.'); });
+  } catch (e) {
+    t.style.display = 'block'; t.select(); document.execCommand('copy'); t.style.display = 'none';
+    alert('Invoice text copied.');
+  }
+}
+</script></body></html>`;
+    const win = window.open("", "_blank");
+    if (!win) { toast("Allow pop-ups to open the invoice.", "warn"); return; }
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+  }
+
   /* ---------- Actions: customers ---------- */
   function saveCustomer(event) {
     event.preventDefault();
@@ -1468,7 +1610,7 @@
     const light = state.settings.theme === "light";
     document.documentElement.dataset.theme = light ? "light" : "dark";
     const themeMeta = document.querySelector('meta[name="theme-color"]');
-    if (themeMeta) themeMeta.content = light ? "#f6f8f6" : "#121514";
+    if (themeMeta) themeMeta.content = light ? "#fbf8f1" : "#050605";
     const shop = state.settings.shopName || "My Shop";
     document.getElementById("shopName").value = shop;
     document.getElementById("shopChip").textContent = shop;
@@ -2327,6 +2469,7 @@
       const btn = document.getElementById("logoutBtn"); btn.disabled = true;
       try { await signOut(); } catch (err) { toast(err.message || "Logout failed.", "warn"); } finally { btn.disabled = false; }
     });
+    document.getElementById("deleteAccountBtn").addEventListener("click", deleteAccount);
 
     document.querySelectorAll("[data-view]").forEach((b) => b.addEventListener("click", () => switchView(b.dataset.view)));
     document.querySelectorAll("[data-go]").forEach((b) => b.addEventListener("click", () => switchView(b.dataset.go)));
@@ -2458,6 +2601,7 @@
       const toggle = event.target.dataset.paymentToggle;
       const edit = event.target.dataset.orderEdit;
       const repeat = event.target.dataset.orderRepeat;
+      const invoice = event.target.dataset.invoice;
       const message = event.target.dataset.messageOrder;
       const del = event.target.dataset.orderDelete;
       const add = event.target.dataset.paymentAdd;
@@ -2466,6 +2610,7 @@
       if (toggle) { paymentOpenId = paymentOpenId === toggle ? null : toggle; renderOrders(); return; }
       if (repeat) { startRepeatOrder(state.orders.find((o) => o.id === repeat)); return; }
       if (edit) { startOrderEdit(edit); return; }
+      if (invoice) { openInvoice(invoice); return; }
       if (message) {
         activePhone = message;
         document.getElementById("aiDraftBox").hidden = true;
@@ -2802,4 +2947,22 @@
   const rd = document.getElementById("reportDate"); if (rd) rd.value = todayISO();
   const im = document.getElementById("insightMonth"); if (im) im.value = todayISO().slice(0, 7);
   initCloud();
+
+  /* Bridge used by the free offline help assistant (help-chat.js). */
+  window.SellMateHelp = {
+    openView: switchView,
+    exportBackup: exportBackup,
+    changePassword: () => showRecovery("change"),
+    currentView: () => {
+      const active = document.querySelector(".view.active");
+      return active ? active.id.replace("view-", "") : "home";
+    },
+    snapshot: () => ({
+      products: state.products.length,
+      orders: state.orders.length,
+      customers: state.customers.length,
+      lowStock: lowProducts().length,
+      due: state.orders.reduce((sum, o) => sum + Math.max(0, orderBalance(o)), 0)
+    })
+  };
 })();

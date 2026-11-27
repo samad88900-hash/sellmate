@@ -55,3 +55,25 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
+
+-- Self-serve account deletion (called from the app via sb.rpc('delete_account'))
+create or replace function public.delete_account()
+returns void
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+declare
+  v_user uuid := auth.uid();
+begin
+  if v_user is null then
+    raise exception 'Not signed in.';
+  end if;
+  delete from public.workspaces where user_id = v_user;
+  delete from public.profiles where id = v_user;
+  delete from auth.users where id = v_user;
+end;
+$$;
+
+revoke all on function public.delete_account() from public, anon;
+grant execute on function public.delete_account() to authenticated;

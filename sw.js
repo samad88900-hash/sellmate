@@ -1,10 +1,12 @@
 /* SellMate service worker — offline cache for the app shell. */
-const CACHE = "sellmate-v31";
+const CACHE = "sellmate-v42";
 const ASSETS = [
   "./",
   "./index.html",
   "./style.css",
   "./script.js",
+  "./help-kb.js",
+  "./help-chat.js",
   "./supabase-config.js",
   "./privacy.html",
   "./terms.html",
