@@ -7,6 +7,7 @@
   "use strict";
 
   const STORE = "sellmate.v2"; // legacy local key (not used for cloud mode)
+  const GUEST_KEY = "sellmate.guest"; // tab-only demo workspace, never cloud
   const THEME_KEY = "sellmate-theme";
   const APP_VIEWS = ["home", "products", "orders", "customers", "chat", "more"];
   const STATUSES = ["New", "Confirmed", "Packed", "Dispatched", "Delivered", "Returned", "Cancelled"];
@@ -35,6 +36,7 @@
   });
 
   let state = blank();
+  let guestMode = false;
   let currentUser = null;
   let sb = null;
   let recoveryIntent = false;
@@ -127,6 +129,82 @@
       const saved = localStorage.getItem(THEME_KEY);
       return saved === "light" || saved === "dark" ? saved : null;
     } catch (_) { return null; }
+  }
+
+  function guestActive() {
+    try { return sessionStorage.getItem(GUEST_KEY) !== null; } catch (_) { return false; }
+  }
+
+  function readGuestState() {
+    try {
+      const raw = sessionStorage.getItem(GUEST_KEY);
+      const data = raw ? JSON.parse(raw) : null;
+      return normalizeState(data && typeof data === "object" && !Array.isArray(data) ? data : blank());
+    } catch (_) { return blank(); }
+  }
+
+  function persistGuestState() {
+    try {
+      sessionStorage.setItem(GUEST_KEY, JSON.stringify(state));
+      return true;
+    } catch (_) {
+      console.warn("SellMate: guest data could not be saved");
+      return false;
+    }
+  }
+
+  function resetWorkspacePointers() {
+    editingProduct = editingOrder = editingCustomer = null;
+    editingSupplier = null;
+    activePhone = null;
+    paymentOpenId = null;
+    activeLedgerId = null;
+    parsedPaste = null;
+    selectedPriceIds = null;
+    selectedFollowups = new Set();
+    clearPriceList();
+    clearDraft();
+  }
+
+  function startGuest(options) {
+    const restoring = !!(options && options.restore);
+    guestMode = true;
+    currentUser = null;
+    cloudReady = false;
+    workspaceLoaded = true;
+    state = restoring ? readGuestState() : blank();
+    state.settings.shopName = state.settings.shopName || "Guest Shop";
+    const lang = window.SellMateLang;
+    if (lang && lang.get() === "en") state.settings.language = "en";
+    else if (lang && state.settings.language === "en") lang.set("en", false);
+    resetWorkspacePointers();
+    persistGuestState();
+    showAppShell();
+    applySettings();
+    renderProductOptions();
+    renderReplyTemplates();
+    resetOrderForm();
+    renderAll();
+    switchView("home");
+    if (!restoring) toast("Guest mode. Data stays on this device.");
+  }
+
+  async function endGuest() {
+    if (!guestMode) return;
+    if (!askConfirm("Exit guest mode? Your demo data on this device will be cleared.")) return;
+    await flushSave();
+    try { sessionStorage.removeItem(GUEST_KEY); } catch (_) {}
+    guestMode = false;
+    state = blank();
+    resetWorkspacePointers();
+    applySettings();
+    authTab("login");
+    showAuthScreen();
+    setAuthStatus("Guest mode closed.", "ok");
+  }
+
+  function isCloudUser() {
+    return !guestMode && !!currentUser;
   }
 
   function initials(name) {
@@ -297,7 +375,12 @@
     "Expense saved.": "Expense save ho gaya.",
     "Workspace synced from another tab.": "Workspace doosre tab se sync ho gaya.",
     "Delete your account and ALL cloud data? This cannot be undone.": "Account aur saara cloud data delete karein? Ye wapas nahi ho sakta.",
-    "Could not start the cloud connection.": "Cloud connection start nahi ho saka."
+    "Could not start the cloud connection.": "Cloud connection start nahi ho saka.",
+    "Guest mode. Data stays on this device.": "Guest mode. Data isi device par rahega.",
+    "Exit guest mode? Your demo data on this device will be cleared.": "Guest mode se bahar nikalna hai? Is device ka demo data clear ho jayega.",
+    "Guest mode closed.": "Guest mode band ho gaya.",
+    "Guest data could not be saved on this device.": "Guest data is device par save nahi ho saka.",
+    "Exit guest mode first to create an account.": "Account banane ke liye pehle guest mode se bahar niklein."
   };
 
   function localizeMessage(message) {
@@ -607,6 +690,14 @@
   }
 
   function save() {
+    if (guestMode) {
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => {
+        saveTimer = null;
+        if (!persistGuestState()) toast("Guest data could not be saved on this device.", "warn");
+      }, 200);
+      return;
+    }
     if (!cloudReady || !currentUser) return;
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => { saveTimer = null; persistStateNow(); }, 350);
@@ -621,12 +712,17 @@
     if (saveTimer) {
       clearTimeout(saveTimer);
       saveTimer = null;
+      if (guestMode) {
+        persistGuestState();
+        return Promise.resolve();
+      }
       return persistStateNow();
     }
     return Promise.resolve();
   }
 
   async function handleSession(session) {
+    if (guestMode) return;
     const nextUser = session ? session.user : null;
     if (workspaceLoaded && currentUser && nextUser && currentUser.id === nextUser.id) return;
     if (currentUser && (!nextUser || nextUser.id !== currentUser.id)) await flushSave();
@@ -747,6 +843,8 @@
     await flushSave();
     await persistStateNow();
     await sb.auth.signOut();
+    try { sessionStorage.removeItem(GUEST_KEY); } catch (_) {}
+    guestMode = false;
     state = blank();
     currentUser = null;
     lastAuthUserId = null;
@@ -839,6 +937,8 @@ grant execute on function public.delete_account() to authenticated;`;
       if (error) throw error;
       await sb.auth.signOut();
       cancelPendingSave();
+      try { sessionStorage.removeItem(GUEST_KEY); } catch (_) {}
+      guestMode = false;
       state = blank();
       currentUser = null;
       lastAuthUserId = null;
@@ -2090,6 +2190,14 @@ function copyInvoice() {
     document.querySelectorAll("[data-lang-code]").forEach((el) => { el.textContent = lang.toUpperCase(); });
     const skip = document.querySelector(".skip-link");
     if (skip) skip.textContent = uiText("Main par jayein", "Skip to main content");
+    const guestBtn = document.getElementById("guestAuthBtn");
+    if (guestBtn) guestBtn.textContent = uiText("Guest ke taur par dekhein", "Continue as guest");
+    const guestNote = document.getElementById("guestNote");
+    if (guestNote) guestNote.textContent = uiText("Account ki zarurat nahi — demo data isi tab me rahega.", "No account needed — demo data stays in this tab.");
+    const guestChip = document.getElementById("guestChip");
+    if (guestChip) guestChip.textContent = uiText("Guest · is device", "Guest · local");
+    const logoutBtn = document.getElementById("logoutBtn");
+    if (logoutBtn) logoutBtn.textContent = guestMode ? uiText("Guest mode se bahar", "Exit guest mode") : "Log out";
     document.querySelectorAll("[data-lang-toggle]").forEach((btn) => {
       const action = english
         ? uiText("Roman Urdu par switch karein", "Switch to Roman Urdu")
@@ -2131,6 +2239,12 @@ function copyInvoice() {
     document.getElementById("shopName").value = shop;
     document.getElementById("shopChip").textContent = shop;
     const acct = document.getElementById("accountName"); if (acct) acct.textContent = shop;
+    const emailEl = document.getElementById("accountEmail");
+    if (emailEl && guestMode) emailEl.textContent = uiText("Local demo · no cloud", "Local demo · no cloud");
+    else if (emailEl && currentUser) emailEl.textContent = currentUser.email || currentUser.phone || "Signed in";
+    const guestChip = document.getElementById("guestChip"); if (guestChip) guestChip.hidden = !guestMode;
+    const changeBtn = document.getElementById("changePasswordBtn"); if (changeBtn) changeBtn.hidden = guestMode;
+    const deleteBtn = document.getElementById("deleteAccountBtn"); if (deleteBtn) deleteBtn.hidden = guestMode;
     const hour = new Date().getHours();
     const greet = hour < 12
       ? uiText("Good morning", "Good morning")
@@ -2991,9 +3105,13 @@ function copyInvoice() {
     });
     document.getElementById("changePasswordBtn").addEventListener("click", () => showRecovery("change"));
     document.getElementById("recoveryCancelBtn").addEventListener("click", cancelRecovery);
+    document.getElementById("guestAuthBtn").addEventListener("click", () => startGuest());
     document.getElementById("logoutBtn").addEventListener("click", async () => {
       const btn = document.getElementById("logoutBtn"); btn.disabled = true;
-      try { await signOut(); } catch (err) { toast(friendlyError(err, "Logout failed."), "warn"); } finally { btn.disabled = false; }
+      try {
+        if (guestMode) await endGuest();
+        else await signOut();
+      } catch (err) { toast(friendlyError(err, "Logout failed."), "warn"); } finally { btn.disabled = false; }
     });
     document.getElementById("deleteAccountBtn").addEventListener("click", deleteAccount);
 
@@ -3498,27 +3616,35 @@ function copyInvoice() {
   const ed = document.getElementById("expenseDate"); if (ed) ed.value = todayISO();
   const rd = document.getElementById("reportDate"); if (rd) rd.value = todayISO();
   const im = document.getElementById("insightMonth"); if (im) im.value = todayISO().slice(0, 7);
-  initCloud().catch((error) => {
-    console.warn("SellMate startup failed");
-    showAuthScreen();
-    setAuthStatus(friendlyError(error, "Could not start the cloud connection."), "warn");
-  });
+  if (guestActive()) {
+    startGuest({ restore: true });
+  } else {
+    initCloud().catch((error) => {
+      console.warn("SellMate startup failed");
+      showAuthScreen();
+      setAuthStatus(friendlyError(error, "Could not start the cloud connection."), "warn");
+    });
+  }
 
   /* Bridge used by the free offline help assistant (help-chat.js). */
   window.SellMateHelp = {
     openView: switchView,
     exportBackup: exportBackup,
     changePassword: () => {
-      if (!currentUser) {
-        authTab("login");
-        showAuthScreen();
-        setAuthStatus("Sign in first, then change your password.", "warn");
+      if (!isCloudUser()) {
+        toast("Exit guest mode first to create an account.", "warn");
         return;
       }
       showRecovery("change");
     },
-    isSignedIn: () => !!currentUser,
+    isSignedIn: () => !!currentUser || guestMode,
+    isCloudUser: isCloudUser,
+    isGuest: () => guestMode,
     showAuth: (tab) => {
+      if (guestMode) {
+        toast("Exit guest mode first to create an account.", "warn");
+        return;
+      }
       authTab(tab === "signup" ? "signup" : "login");
       showAuthScreen();
     },

@@ -55,6 +55,18 @@
     try { return !!api.isSignedIn(); } catch (_) { return true; }
   }
 
+  function isCloudUser() {
+    const api = bridge();
+    if (!api || typeof api.isCloudUser !== "function") return isSignedIn();
+    try { return !!api.isCloudUser(); } catch (_) { return isSignedIn(); }
+  }
+
+  function isGuest() {
+    const api = bridge();
+    if (!api || typeof api.isGuest !== "function") return false;
+    try { return !!api.isGuest(); } catch (_) { return false; }
+  }
+
   function showAuth(tab) {
     const api = bridge();
     if (!api || typeof api.showAuth !== "function") return false;
@@ -322,10 +334,17 @@
     /* login/signup/forgot target the auth screen, never an app view. */
     if (entry.view === "login" || entry.view === "signup" || action === "auth") {
       const tab = entry.view === "signup" ? "signup" : "login";
-      if (isSignedIn()) {
+      if (isCloudUser()) {
         addMessage("bot", tr(
           "Tum pehle se hi login ho — ye step karne ki zarurat nahi.",
           "You are already signed in — you do not need this step."
+        ), null);
+        return;
+      }
+      if (isGuest()) {
+        addMessage("bot", tr(
+          "Tum guest mode me ho. Account banana hai to pehle account card se 'Guest mode se bahar' dabao.",
+          "You are in guest mode. To create an account, first tap 'Exit guest mode' in the account card."
         ), null);
         return;
       }
@@ -337,15 +356,21 @@
       return;
     }
 
-    /* These actions touch signed-in account data. */
-    if (action === "backup" || action === "changePassword" || action === "deleteAccount" || action === "theme") {
-      if (!isSignedIn()) {
-        addMessage("bot", tr(
-          "Pehle login kar lo, phir main ye kaam kar dunga.",
-          "Please log in first and I can do that for you."
-        ), null);
-        return;
-      }
+    /* Backup/theme work for guests too; password/delete need a real account. */
+    const cloudOnly = action === "changePassword" || action === "deleteAccount";
+    if (cloudOnly && !isCloudUser()) {
+      addMessage("bot", tr(
+        "Ye account feature hai. Pehle account bana lo.",
+        "This is an account feature. Please create an account first."
+      ), null);
+      return;
+    }
+    if ((action === "backup" || action === "theme") && !isSignedIn()) {
+      addMessage("bot", tr(
+        "Pehle login kar lo, phir main ye kaam kar dunga.",
+        "Please log in first and I can do that for you."
+      ), null);
+      return;
     }
 
     const unavailable = tr(
