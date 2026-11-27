@@ -2,6 +2,10 @@
 -- Works with Pakistan numbers (+92) because the SMS goes out from your own paired Android SIM.
 --
 -- BEFORE RUNNING: replace PASTE_TEXTBEE_API_KEY_HERE with your textbee API key.
+-- IMPORTANT: if you run this file unchanged, the function and hook are created but
+-- SMS delivery silently fails: textbee rejects the placeholder key, no code arrives
+-- and the app shows no error. The placeholder must be replaced before (or re-run
+-- after any key change) for phone OTP sign-in to work. Never commit a real key.
 -- Then run this whole file in Supabase SQL Editor.
 -- Then enable the hook in: Authentication > Hooks > Add hook > Send SMS > Postgres Function > public.sellmate_send_sms
 
@@ -15,6 +19,7 @@ as $$
 declare
   v_phone text := event->'user'->>'phone';
   v_otp text := event->'sms'->>'otp';
+  -- Placeholder only. Unchanged = silent SMS delivery failure (no OTP arrives).
   v_key text := 'PASTE_TEXTBEE_API_KEY_HERE';
 begin
   if v_phone is null or v_otp is null then

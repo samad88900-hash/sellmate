@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="ur" data-theme="light">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
@@ -16,7 +16,8 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
-  <section class="auth-screen" id="authScreen" hidden>
+  <a class="skip-link" href="#mainContent">Skip to main content</a>
+  <section class="auth-screen" id="authScreen" role="main" hidden>
     <div class="auth-card">
       <button class="lang-toggle auth-lang-toggle" type="button" data-lang-toggle aria-label="Switch language" title="Switch language">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.4 3.8 5.4 3.8 9s-1.3 6.6-3.8 9c-2.5-2.4-3.8-5.4-3.8-9S9.5 5.4 12 3z"/></svg>
@@ -31,13 +32,14 @@
       </div>
 
       <div class="auth-tabs" role="tablist" aria-label="Authentication">
-        <button class="auth-tab active" type="button" data-auth-tab="login">Log in</button>
-        <button class="auth-tab" type="button" data-auth-tab="signup">Create account</button>
+        <button class="auth-tab active" id="authTabLogin" type="button" role="tab" aria-selected="true" aria-controls="loginForm" data-auth-tab="login">Log in</button>
+        <button class="auth-tab" id="authTabSignup" type="button" role="tab" aria-selected="false" aria-controls="signupForm" data-auth-tab="signup">Create account</button>
       </div>
 
-      <form id="loginForm" class="auth-form">
+      <form id="loginForm" class="auth-form" role="tabpanel" aria-labelledby="authTabLogin">
         <label class="field">Email<input id="loginEmail" type="email" autocomplete="email" required placeholder="you@example.com" /></label>
-        <label class="field">Password
+        <div class="field">
+          <label for="loginPassword">Password</label>
           <div class="password-wrap">
             <input id="loginPassword" type="password" autocomplete="current-password" required placeholder="Your password" />
             <button class="password-eye" type="button" data-toggle-password="loginPassword" aria-label="Show password" aria-pressed="false">
@@ -45,17 +47,18 @@
               <svg class="eye-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20C5 20 1 12 1 12a21.8 21.8 0 0 1 5.06-6.06"/><path d="M9.9 4.24A10.54 10.54 0 0 1 12 4c7 0 11 8 11 8a21.83 21.83 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 0 1-4.24-4.24"/><path d="M1 1l22 22"/></svg>
             </button>
           </div>
-        </label>
+        </div>
         <div class="auth-row">
           <button class="link-btn" type="button" id="forgotPasswordBtn">Forgot password?</button>
         </div>
         <button class="btn primary full" type="submit" id="loginBtn">Log in</button>
       </form>
 
-      <form id="signupForm" class="auth-form" hidden>
+      <form id="signupForm" class="auth-form" role="tabpanel" aria-labelledby="authTabSignup" hidden>
         <label class="field">Shop name<input id="signupShop" type="text" autocomplete="organization" placeholder="e.g. Samad Store" /></label>
         <label class="field">Email<input id="signupEmail" type="email" autocomplete="email" required placeholder="you@example.com" /></label>
-        <label class="field">Password
+        <div class="field">
+          <label for="signupPassword">Password</label>
           <div class="password-wrap">
             <input id="signupPassword" type="password" autocomplete="new-password" minlength="6" required placeholder="At least 6 characters" />
             <button class="password-eye" type="button" data-toggle-password="signupPassword" aria-label="Show password" aria-pressed="false">
@@ -63,7 +66,7 @@
               <svg class="eye-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20C5 20 1 12 1 12a21.8 21.8 0 0 1 5.06-6.06"/><path d="M9.9 4.24A10.54 10.54 0 0 1 12 4c7 0 11 8 11 8a21.83 21.83 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 0 1-4.24-4.24"/><path d="M1 1l22 22"/></svg>
             </button>
           </div>
-        </label>
+        </div>
         <button class="btn primary full" type="submit" id="signupBtn">Create account</button>
       </form>
 
@@ -84,7 +87,8 @@
 
       <form id="recoveryForm" class="auth-form" hidden>
         <p class="auth-note" id="recoveryHelp" style="margin-top:0;margin-bottom:4px;text-align:left;">Set a new password for your account.</p>
-        <label class="field" id="recoveryOldField" hidden>Current password
+        <div class="field" id="recoveryOldField" hidden>
+          <label for="recoveryOldPassword">Current password</label>
           <div class="password-wrap">
             <input id="recoveryOldPassword" type="password" autocomplete="current-password" placeholder="Your current password" />
             <button class="password-eye" type="button" data-toggle-password="recoveryOldPassword" aria-label="Show password" aria-pressed="false">
@@ -92,8 +96,9 @@
               <svg class="eye-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20C5 20 1 12 1 12a21.8 21.8 0 0 1 5.06-6.06"/><path d="M9.9 4.24A10.54 10.54 0 0 1 12 4c7 0 11 8 11 8a21.83 21.83 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 0 1-4.24-4.24"/><path d="M1 1l22 22"/></svg>
             </button>
           </div>
-        </label>
-        <label class="field">New password
+        </div>
+        <div class="field">
+          <label for="recoveryPassword">New password</label>
           <div class="password-wrap">
             <input id="recoveryPassword" type="password" autocomplete="new-password" minlength="6" required placeholder="At least 6 characters" />
             <button class="password-eye" type="button" data-toggle-password="recoveryPassword" aria-label="Show password" aria-pressed="false">
@@ -101,7 +106,7 @@
               <svg class="eye-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20C5 20 1 12 1 12a21.8 21.8 0 0 1 5.06-6.06"/><path d="M9.9 4.24A10.54 10.54 0 0 1 12 4c7 0 11 8 11 8a21.83 21.83 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 0 1-4.24-4.24"/><path d="M1 1l22 22"/></svg>
             </button>
           </div>
-        </label>
+        </div>
         <button class="btn primary full" type="submit" id="recoveryBtn">Update password</button>
         <button class="btn ghost full" type="button" id="recoveryCancelBtn">Cancel</button>
       </form>
@@ -174,7 +179,7 @@
         </div>
       </header>
 
-      <main class="content">
+      <main class="content" id="mainContent">
         <!-- HOME -->
         <section class="view active" id="view-home">
           <div class="section-head">
@@ -303,6 +308,7 @@
                   <label class="field full">Tracking number <small>(optional)</small><input id="oTracking" placeholder="Courier tracking ID" /></label>
                   <label class="field full">Delivery address <small>(optional)</small><input id="oAddress" placeholder="Area, city, landmark…" /></label>
                   <label class="field full">Internal notes <small>(optional)</small><input id="oNotes" placeholder="Gift wrap, colour preference, follow-up…" /></label>
+                  <label class="field">Order date<input id="orderDate" type="date" /></label>
 
                   <div class="full total-strip" id="orderTotals"></div>
                   <button class="btn primary full" type="submit" id="orderSubmit">Save order</button>
@@ -428,6 +434,7 @@
               <div class="panel-head"><h3>Expenses</h3></div>
               <form id="expenseForm" class="form-grid">
                 <label class="field full">Expense name<input id="eName" required placeholder="e.g. Packaging" /></label>
+                <label class="field">Date<input id="expenseDate" type="date" /></label>
                 <label class="field">Amount (PKR)<input id="eAmount" type="number" min="0" step="1" required /></label>
                 <label class="field">Category<select id="eCategory"><option>Packaging</option><option>Transport</option><option>Rent</option><option>Utilities</option><option>Supplies</option><option>Other</option></select></label>
                 <button class="btn primary full" type="submit">Add expense</button>
@@ -459,7 +466,7 @@
             <div class="two-col">
               <form id="supplierForm" class="form-grid">
                 <label class="field full">Supplier name<input id="sName" required placeholder="e.g. Metro Wholesale" /></label>
-                <label class="field">WhatsApp number<input id="sPhone" required inputmode="tel" placeholder="923001234567" /></label>
+                <label class="field">WhatsApp number <small>(optional)</small><input id="sPhone" inputmode="tel" placeholder="923001234567" /></label>
                 <label class="field">Notes<input id="sNotes" placeholder="Payment terms, delivery days…" /></label>
                 <button class="btn primary full" type="submit" id="supplierSubmit">Save supplier</button>
                 <button class="text-btn full" type="button" id="cancelSupplierEdit" hidden>Cancel edit</button>

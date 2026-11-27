@@ -22,6 +22,8 @@ Phone login is already built into the app (**Continue with phone** button). It u
 2. Replace `PASTE_TEXTBEE_API_KEY_HERE` with your textbee API key.
 3. Paste the whole file into **Supabase Dashboard → SQL Editor → New query → Run**.
 
+> **Warning:** If you run the SQL unchanged while `PASTE_TEXTBEE_API_KEY_HERE` is still in place, the function and hook are created successfully, but SMS delivery **silently fails**: textbee rejects the placeholder key, no code arrives, and the app shows no error. Replace the placeholder with your own textbee API key first; if you already ran it, replace the key and re-run the file. Never commit a real key to this repo.
+
 The SQL creates `public.sellmate_send_sms`, enables `pg_net`, and locks the function down so only Supabase Auth can call it. Your API key stays in the database function, not in this repo or the website.
 
 ## 3. Supabase Auth settings
@@ -52,4 +54,4 @@ The SQL creates `public.sellmate_send_sms`, enables `pg_net`, and locks the func
 - If the paired phone is offline, codes queue and may expire. Keep it online.
 - No Twilio/MessageBird credentials are needed anywhere.
 - If you later move to more than 300 SMS/month, textbee Pro is a flat paid plan; the app code does not change.
-- Email/password and Google login keep working exactly as before.
+- Email/password login keeps working exactly as before. Google sign-in is optional/testing and is not publicly launched yet.

@@ -7,8 +7,11 @@
   "use strict";
 
   const STORE = "sellmate.v2"; // legacy local key (not used for cloud mode)
+  const THEME_KEY = "sellmate-theme";
+  const APP_VIEWS = ["home", "products", "orders", "customers", "chat", "more"];
   const STATUSES = ["New", "Confirmed", "Packed", "Dispatched", "Delivered", "Returned", "Cancelled"];
   const PRE_DISPATCH = ["New", "Confirmed", "Packed"];
+  const STOCK_CONSUMING = ["Dispatched", "Delivered"];
   const METHODS = ["Cash", "Easypaisa", "JazzCash", "Bank transfer", "Other"];
   const SOURCES = ["WhatsApp", "Instagram", "Phone", "In person"];
   const EXPENSE_CATEGORIES = ["Packaging", "Transport", "Rent", "Utilities", "Supplies", "Other"];
@@ -39,6 +42,9 @@
   let suppressAuthHandling = false;
   let pendingPhone = null;
   let cloudReady = false;
+  let lastAuthUserId = null;
+  let workspaceLoaded = false;
+  let workspaceChannel = null;
   let saveTimer = null;
   let saving = false;
   let queuedSave = false;
@@ -51,7 +57,22 @@
   function uiText(ur, en) {
     return window.SellMateLang && window.SellMateLang.isEnglish() ? en : ur;
   }
-  let currentTemplate = "";
+  function friendlyError(error, fallback) {
+    const msg = String((error && error.message) || error || "");
+    if (!msg || /Cannot read properties|undefined|null|Invalid attempt|not a function/i.test(msg)) return fallback;
+    return msg;
+  }
+  function clearDraft() {
+    currentDraft = "";
+    const box = document.getElementById("aiDraftBox");
+    if (box) box.hidden = true;
+    document.querySelectorAll("#templateBar .mini-btn").forEach((b) => b.classList.remove("active"));
+  }
+  function clearPriceList() {
+    priceListText = "";
+    const out = document.getElementById("priceOutput");
+    if (out) out.textContent = "";
+  }
   let paymentOpenId = null;
   let activeLedgerId = null;
   let parsedPaste = null;
@@ -88,29 +109,58 @@
     return String(value || "").replace(/\D/g, "");
   }
 
+  function validPhone(value) {
+    const raw = String(value || "").trim();
+    if (/[A-Za-z]/.test(raw)) return false;
+    const digits = cleanPhone(raw);
+    if (raw.startsWith("+")) return digits.length >= 8 && digits.length <= 15;
+    return /^3\d{9}$/.test(digits) || (digits.length >= 8 && digits.length <= 15);
+  }
+
+  function dateField(id) {
+    const value = String((document.getElementById(id) || {}).value || "");
+    return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : todayISO();
+  }
+
+  function readThemePreference() {
+    try {
+      const saved = localStorage.getItem(THEME_KEY);
+      return saved === "light" || saved === "dark" ? saved : null;
+    } catch (_) { return null; }
+  }
+
   function initials(name) {
     return String(name || "?").trim().split(/\s+/).slice(0, 2).map((p) => p[0]).join("").toUpperCase() || "?";
   }
 
-  function todayISO() {
-    return new Date().toISOString().slice(0, 10);
+  function todayISO(value) {
+    const d = value instanceof Date ? value : new Date();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return d.getFullYear() + "-" + month + "-" + day;
+  }
+
+  function parseDate(iso) {
+    if (!iso) return new Date(NaN);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(String(iso))) return new Date(String(iso) + "T00:00:00");
+    return new Date(iso);
   }
 
   function prettyDate(iso) {
     if (!iso) return "";
-    const d = new Date(iso);
+    const d = parseDate(iso);
     return Number.isNaN(d.getTime()) ? String(iso) : d.toLocaleDateString();
   }
 
   function shortDate(iso) {
     if (!iso) return "—";
-    const d = new Date(iso);
+    const d = parseDate(iso);
     return Number.isNaN(d.getTime()) ? String(iso) : d.toLocaleDateString(undefined, { day: "2-digit", month: "short" });
   }
 
   function daysSince(iso) {
     if (!iso) return Infinity;
-    const diff = Date.now() - new Date(iso).getTime();
+    const diff = Date.now() - parseDate(iso).getTime();
     return Number.isFinite(diff) ? Math.floor(diff / 86400000) : Infinity;
   }
 
@@ -149,11 +199,139 @@
     };
   }
 
+  const MESSAGES_UR = {
+    "Add your Supabase Project URL and anon key in supabase-config.js, then reload.": "Supabase URL aur anon key supabase-config.js me daalein, phir reload karein.",
+    "Supabase library could not load. Check your internet connection.": "Supabase library load nahi hui. Internet connection check karein.",
+    "Reset link is invalid or expired. Please request a new one.": "Reset link invalid ya expire ho gaya. Naya link mangayein.",
+    "Enter your email first.": "Pehle email likhein.",
+    "Sending password reset email...": "Password reset email bheja ja raha hai...",
+    "Account created. Check your email to confirm, then log in.": "Account ban gaya. Email confirm karke phir login karein.",
+    "Password reset email sent. Check your inbox/spam.": "Password reset email bhej diya gaya. Inbox/spam check karein.",
+    "Signing in...": "Sign in ho raha hai...",
+    "Creating account...": "Account banaya ja raha hai...",
+    "Redirecting to Google...": "Google ki taraf bheja ja raha hai...",
+    "Use digits only (0, not O), e.g. 03001234567.": "Sirf number likhein (0, O nahi), masalan 03001234567.",
+    "Request a code first.": "Pehle code mangayein.",
+    "Enter the 6-digit code.": "6 digit ka code likhein.",
+    "Verifying code...": "Code verify ho raha hai...",
+    "Could not load your cloud workspace. Check Supabase URL/key and SQL schema.": "Cloud workspace load nahi hua. Supabase URL/key aur SQL schema check karein.",
+    "Cloud save failed. Check your connection.": "Cloud save failed. Connection check karein.",
+    "Logout failed.": "Logout failed.",
+    "Login failed.": "Login failed.",
+    "Signup failed.": "Signup failed.",
+    "Google sign-in failed.": "Google sign-in failed.",
+    "Could not send SMS code.": "SMS code nahi bhej gaya.",
+    "Could not verify code.": "Code verify nahi ho saka.",
+    "Could not resend code.": "Code dobara nahi bhej gaya.",
+    "Could not send reset email.": "Reset email nahi bhej gaya.",
+    "Could not update password. Check your sign-in method and try again.": "Password update nahi hua. Sign-in method check karke dobara koshish karein.",
+    "Password updated. You can now use the app.": "Password update ho gaya. Ab app use kar sakte hain.",
+    "Sign in first, then change your password.": "Pehle sign in karein, phir password badlein.",
+    "Account and all data deleted.": "Account aur saara data delete ho gaya.",
+    "Could not delete account.": "Account delete nahi ho saka.",
+    "Owner setup pending. SQL ready to copy.": "Owner setup baaki hai. SQL copy ke liye tayyar hai.",
+    "SQL copied. Paste it in Supabase SQL Editor.": "SQL copy ho gaya. Supabase SQL Editor me paste karein.",
+    "Select the SQL and copy it manually.": "SQL select karke manually copy karein.",
+    "Select a conversation first.": "Pehle conversation select karein.",
+    "Paste the buyer's message first.": "Pehle buyer ka message paste karein.",
+    "Product updated.": "Product update ho gaya.",
+    "Product saved.": "Product save ho gaya.",
+    "A product with this name already exists.": "Is naam ka product pehle se hai.",
+    "Add at least one item to the order.": "Order me kam se kam ek item daalein.",
+    "Enter a phone number with country code.": "Country code ke saath phone number likhein.",
+    "Order updated.": "Order update ho gaya.",
+    "Order saved.": "Order save ho gaya.",
+    "Not enough available stock for these changes.": "In badlaavon ke liye stock kam hai.",
+    "Not enough available stock for this order.": "Is order ke liye available stock kam hai.",
+    "Not enough available stock to reverse this return.": "Return wapas karne ke liye stock kam hai.",
+    "Enter a payment amount.": "Payment amount likhein.",
+    "Advance recorded.": "Advance record ho gaya.",
+    "Payment recorded.": "Payment record ho gaya.",
+    "Allow pop-ups to open the invoice.": "Invoice kholne ke liye pop-ups allow karein.",
+    "Customer updated.": "Customer update ho gaya.",
+    "Customer saved.": "Customer save ho gaya.",
+    "A customer with this phone already exists.": "Is phone ka customer pehle se hai.",
+    "Backup downloaded.": "Backup download ho gaya.",
+    "Restore this backup? Current data will be replaced.": "Ye backup restore karein? Abhi ka data replace ho jayega.",
+    "Backup restored.": "Backup restore ho gaya.",
+    "That file is not a valid SellMate backup.": "Ye file valid SellMate backup nahi hai.",
+    "Could not read that file.": "Ye file read nahi ho saki.",
+    "Select customers in the follow-up queue first.": "Pehle follow-up queue se customers select karein.",
+    "Order loaded — review and save when ready.": "Order load ho gaya. Review karke save karein.",
+    "Paste a buyer message first.": "Pehle buyer ka message paste karein.",
+    "Order form filled — please review and save.": "Order form bhar gaya. Review karke save karein.",
+    "Payment recorded in ledger.": "Payment ledger me record ho gaya.",
+    "Statement copied.": "Statement copy ho gaya.",
+    "Copy failed — select the text manually.": "Copy failed. Text manually select karke copy karein.",
+    "Supplier updated.": "Supplier update ho gaya.",
+    "Supplier saved.": "Supplier save ho gaya.",
+    "Enter a bill amount.": "Bill amount likhein.",
+    "Enter a paid amount.": "Paid amount likhein.",
+    "Supplier deleted.": "Supplier delete ho gaya.",
+    "Supplier statement copied.": "Supplier statement copy ho gaya.",
+    "Suppliers CSV downloaded.": "Suppliers CSV download ho gaya.",
+    "Select at least one product.": "Kam se kam ek product select karein.",
+    "Quick replies saved.": "Quick replies save ho gayein.",
+    "Reset all custom replies to the built-in wording?": "Saari custom replies built-in text par reset karein?",
+    "Replies reset to defaults.": "Replies default par reset ho gayein.",
+    "Orders CSV downloaded.": "Orders CSV download ho gaya.",
+    "Payments CSV downloaded.": "Payments CSV download ho gaya.",
+    "Customers CSV downloaded.": "Customers CSV download ho gaya.",
+    "Products CSV downloaded.": "Products CSV download ho gaya.",
+    "Reset this workspace? This clears your cloud data for this account.": "Ye workspace reset karein? Is account ka saara cloud data clear ho jayega.",
+    "Workspace reset.": "Workspace reset ho gaya.",
+    "Stock updated.": "Stock update ho gaya.",
+    "Delete this product? Existing orders keep their item details.": "Ye product delete karein? Purane orders ke item details rahenge.",
+    "Remove this payment entry?": "Ye payment entry hataayein?",
+    "Payment removed.": "Payment hata diya gaya.",
+    "Delete this order? Stock and payments recorded for it will also be removed from the app.": "Ye order delete karein? Iska stock aur payments bhi app se hata diye jayein ge.",
+    "No previous order for this customer.": "Is customer ka koi purana order nahi hai.",
+    "This customer has orders. Delete the orders first.": "Is customer ke orders hain. Pehle orders delete karein.",
+    "Delete this customer?": "Ye customer delete karein?",
+    "Draft copied.": "Draft copy ho gaya.",
+    "Add an Instagram handle to this customer first.": "Pehle is customer ka Instagram handle daalein.",
+    "Day Book generated.": "Day Book ban gaya.",
+    "Price list generated.": "Price list ban gayi.",
+    "Restock list generated.": "Restock list ban gayi.",
+    "Monthly summary generated.": "Monthly summary ban gaya.",
+    "Expense saved.": "Expense save ho gaya.",
+    "Workspace synced from another tab.": "Workspace doosre tab se sync ho gaya.",
+    "Delete your account and ALL cloud data? This cannot be undone.": "Account aur saara cloud data delete karein? Ye wapas nahi ho sakta.",
+    "Could not start the cloud connection.": "Cloud connection start nahi ho saka."
+  };
+
+  function localizeMessage(message) {
+    const text = String(message == null ? "" : message);
+    if (!text || !window.SellMateLang || window.SellMateLang.isEnglish()) return text;
+    if (Object.prototype.hasOwnProperty.call(MESSAGES_UR, text)) return MESSAGES_UR[text];
+    let match = text.match(/^Status changed to (.+)\.$/);
+    if (match) return "Status " + match[1] + " ho gaya.";
+    match = text.match(/^Ready (.+) reply — review before sending\.$/);
+    if (match) return match[1] + " reply tayyar hai — bhejne se pehle check karein.";
+    match = text.match(/^Opening (\d+) WhatsApp chats?\.$/);
+    if (match) return match[1] + " WhatsApp chat kholein ge.";
+    match = text.match(/^Open WhatsApp for (\d+) customers\? Allow pop-ups if your browser asks\.$/);
+    if (match) return match[1] + " customers ke liye WhatsApp kholein? Browser pooche to pop-ups allow karein.";
+    match = text.match(/^Generate the (.+) first\.$/);
+    if (match) return "Pehle " + match[1] + " banayein.";
+    match = text.match(/^(.+) copied\.$/);
+    if (match) return match[1] + " copy ho gaya.";
+    match = text.match(/^Only (\d+) (.+) available \(others reserved\)\.$/);
+    if (match) return "Sirf " + match[1] + " " + match[2] + " available hain (baaki reserve hain).";
+    match = text.match(/^Account deletion is temporarily unavailable\. Please contact (.+)\.$/);
+    if (match) return "Account deletion abhi unavailable hai. " + match[1] + " se contact karein.";
+    return text;
+  }
+
+  function askConfirm(message) {
+    return window["confirm"](localizeMessage(message));
+  }
+
   function toast(message, type) {
     const area = document.getElementById("toastArea");
     const el = document.createElement("div");
     el.className = "toast " + (type || "ok");
-    el.innerHTML = "<span>" + (type === "warn" ? "⚠" : "✓") + "</span><span>" + esc(message) + "</span>";
+    el.innerHTML = "<span>" + (type === "warn" ? "⚠" : "✓") + "</span><span>" + esc(localizeMessage(message)) + "</span>";
     area.appendChild(el);
     setTimeout(() => {
       el.style.opacity = "0";
@@ -233,22 +411,93 @@
     };
   }
 
+  function normalizePayment(payment) {
+    return {
+      id: payment.id || uid(),
+      amount: num(payment.amount),
+      method: payment.method || "Cash",
+      note: payment.note || "",
+      date: payment.date || todayISO()
+    };
+  }
+
   function normalizeState(raw) {
     const base = blank();
     const src = raw && typeof raw === "object" ? raw : {};
+    const products = Array.isArray(src.products) ? src.products.map((p) => ({
+      id: p.id || uid(),
+      name: String(p.name || "Product"),
+      sku: p.sku || "",
+      price: num(p.price),
+      cost: num(p.cost),
+      stock: num(p.stock),
+      low: num(p.low, 3),
+      unit: p.unit || "pc"
+    })) : base.products;
+    const customers = Array.isArray(src.customers) ? src.customers.map((c) => ({
+      id: c.id || uid(),
+      name: String(c.name || "Customer"),
+      phone: c.phone || "",
+      instagram: c.instagram || "",
+      notes: c.notes || "",
+      createdAt: c.createdAt || todayISO(),
+      payments: Array.isArray(c.payments) ? c.payments.map(normalizePayment) : []
+    })) : base.customers;
+    const orders = Array.isArray(src.orders) ? src.orders.map((o) => {
+      const status = STATUSES.includes(o.status) ? o.status : "New";
+      return {
+        id: o.id || uid(),
+        code: o.code || "SM-" + uid(),
+        customerId: o.customerId || null,
+        customerName: String(o.customerName || "Customer"),
+        phone: o.phone || "",
+        instagram: o.instagram || "",
+        date: o.date || todayISO(),
+        status,
+        dispatched: !!o.dispatched || STOCK_CONSUMING.includes(status),
+        returned: !!o.returned || status === "Returned",
+        cancelled: !!o.cancelled || status === "Cancelled",
+        items: Array.isArray(o.items) ? o.items.map((i) => ({
+          name: String(i.name || "Item"),
+          productId: i.productId || null,
+          qty: num(i.qty, 1),
+          price: num(i.price),
+          cost: num(i.cost)
+        })).filter((i) => i.name) : [],
+        discount: num(o.discount),
+        delivery: num(o.delivery),
+        payments: Array.isArray(o.payments) ? o.payments.map(normalizePayment) : [],
+        dueDate: o.dueDate || "",
+        courier: o.courier || "",
+        tracking: o.tracking || "",
+        address: o.address || "",
+        notes: o.notes || "",
+        updatedAt: o.updatedAt || o.date || todayISO()
+      };
+    }) : base.orders;
+    const chats = {};
+    if (src.chats && typeof src.chats === "object") {
+      Object.keys(src.chats).forEach((phone) => {
+        chats[phone] = Array.isArray(src.chats[phone]) ? src.chats[phone].map((m) => ({
+          from: m.from === "buyer" ? "buyer" : "seller",
+          text: String(m.text || ""),
+          time: m.time || ""
+        })) : [];
+      });
+    }
     return {
-      products: Array.isArray(src.products) ? src.products : base.products,
-      customers: Array.isArray(src.customers) ? src.customers : base.customers,
-      orders: Array.isArray(src.orders) ? src.orders : base.orders,
+      products,
+      customers,
+      orders,
       expenses: Array.isArray(src.expenses) ? src.expenses.map(normalizeExpense) : base.expenses,
       suppliers: Array.isArray(src.suppliers) ? src.suppliers.map(normalizeSupplier) : base.suppliers,
-      chats: src.chats && typeof src.chats === "object" ? src.chats : base.chats,
+      chats,
       settings: normalizeSettings(src.settings)
     };
   }
 
   function setAuthStatus(message, type) {
-    const text = message || "";
+    const text = localizeMessage(message || "");
     const cls = "auth-status" + (type ? " " + type : "");
     [document.getElementById("authStatus"), document.getElementById("phoneStatus")].forEach((el) => {
       if (!el) return;
@@ -277,13 +526,17 @@
     document.getElementById("phoneForm").hidden = !phone;
     document.getElementById("recoveryForm").hidden = true;
     document.getElementById("phoneAuthBtn").hidden = phone;
-    if (!phone) document.getElementById("otpBox").hidden = true;
-    document.querySelectorAll("[data-auth-tab]").forEach((b) => b.classList.toggle("active", b.dataset.authTab === tab));
+    document.getElementById("otpBox").hidden = !(phone && !!pendingPhone);
+    document.querySelectorAll("[data-auth-tab]").forEach((b) => {
+      const active = b.dataset.authTab === tab;
+      b.classList.toggle("active", active);
+      if (b.hasAttribute("role")) b.setAttribute("aria-selected", String(active));
+    });
     setAuthStatus("");
   }
 
   function showRecovery(mode, message) {
-    recoveryNeedsOld = mode === "change";
+    recoveryNeedsOld = mode === "change" && !!(currentUser && currentUser.email);
     const oldField = document.getElementById("recoveryOldField");
     const oldInput = document.getElementById("recoveryOldPassword");
     oldField.hidden = !recoveryNeedsOld;
@@ -343,28 +596,50 @@
       const payload = { user_id: currentUser.id, data: state, updated_at: new Date().toISOString() };
       const { error } = await sb.from("workspaces").upsert(payload, { onConflict: "user_id" });
       if (error) throw error;
+      if (workspaceChannel) workspaceChannel.postMessage({ userId: currentUser.id, at: Date.now() });
     } catch (error) {
-      console.warn("SellMate cloud save failed", error);
+      console.warn("SellMate cloud save failed");
       toast("Cloud save failed. Check your connection.", "warn");
     } finally {
       saving = false;
-      if (queuedSave) { queuedSave = false; persistStateNow(); }
+      if (queuedSave) { queuedSave = false; await persistStateNow(); }
     }
   }
 
   function save() {
     if (!cloudReady || !currentUser) return;
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => { persistStateNow(); }, 350);
+    saveTimer = setTimeout(() => { saveTimer = null; persistStateNow(); }, 350);
+  }
+
+  function cancelPendingSave() {
+    if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+    queuedSave = false;
+  }
+
+  function flushSave() {
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+      return persistStateNow();
+    }
+    return Promise.resolve();
   }
 
   async function handleSession(session) {
-    currentUser = session ? session.user : null;
+    const nextUser = session ? session.user : null;
+    if (workspaceLoaded && currentUser && nextUser && currentUser.id === nextUser.id) return;
+    if (currentUser && (!nextUser || nextUser.id !== currentUser.id)) await flushSave();
+    cancelPendingSave();
+    clearDraft();
+    currentUser = nextUser;
+    lastAuthUserId = currentUser ? currentUser.id : null;
     cloudReady = !!currentUser;
+    workspaceLoaded = false;
     if (!currentUser) {
       state = blank();
-      showAuthScreen();
       applySettings();
+      showAuthScreen();
       return;
     }
     try {
@@ -373,13 +648,16 @@
       const lang = window.SellMateLang;
       if (lang) {
         const cloudLang = state.settings.language;
-        if (!lang.hasPreference() && (cloudLang === "en" || cloudLang === "ur")) lang.set(cloudLang, false);
-        state.settings.language = lang.get();
-        save();
+        if (lang.hasPreference()) {
+          state.settings.language = lang.get();
+          save();
+        } else if (cloudLang === "en" || cloudLang === "ur") {
+          lang.set(cloudLang, false);
+        }
       }
       editingProduct = editingOrder = editingCustomer = null;
       activePhone = null; paymentOpenId = null; activeLedgerId = null; activeSupplierId = null; editingSupplier = null;
-      parsedPaste = null; selectedPriceIds = null; selectedFollowups = new Set();
+      parsedPaste = null; selectedPriceIds = null; selectedFollowups = new Set(); clearPriceList();
       const emailEl = document.getElementById("accountEmail");
       if (emailEl) emailEl.textContent = currentUser.email || currentUser.phone || "Signed in";
       showAppShell();
@@ -388,9 +666,17 @@
       renderReplyTemplates();
       resetOrderForm();
       renderAll();
+      workspaceLoaded = true;
     } catch (error) {
-      console.error(error);
+      console.warn("SellMate cloud workspace load failed");
+      cancelPendingSave();
+      currentUser = null;
+      lastAuthUserId = null;
+      cloudReady = false;
+      workspaceLoaded = false;
+      state = blank();
       setAuthStatus("Could not load your cloud workspace. Check Supabase URL/key and SQL schema.", "warn");
+      applySettings();
       showAuthScreen();
     }
   }
@@ -458,13 +744,17 @@
   }
 
   async function signOut() {
+    await flushSave();
     await persistStateNow();
     await sb.auth.signOut();
     state = blank();
     currentUser = null;
+    lastAuthUserId = null;
     cloudReady = false;
-    showAuthScreen();
+    workspaceLoaded = false;
+    clearDraft();
     applySettings();
+    showAuthScreen();
   }
 
   const DELETE_ACCOUNT_SQL = `create or replace function public.delete_account()
@@ -491,10 +781,6 @@ grant execute on function public.delete_account() to authenticated;`;
   const OWNER_EMAIL = "samad88900@gmail.com";
 
   function isOwnerContext() {
-    try {
-      const url = new URL(window.location.href);
-      if (url.searchParams.get("setup") === "delete" || url.hash === "#delete-setup") return true;
-    } catch (_) {}
     return String((currentUser && currentUser.email) || "").toLowerCase() === OWNER_EMAIL;
   }
 
@@ -515,7 +801,11 @@ grant execute on function public.delete_account() to authenticated;`;
       </div>
     </div>`;
     document.body.appendChild(box);
-    const close = () => box.remove();
+    let onKey = null;
+    const close = () => {
+      if (onKey) document.removeEventListener("keydown", onKey);
+      box.remove();
+    };
     box.addEventListener("click", (event) => {
       if (event.target === box || event.target.hasAttribute("data-close-setup")) { close(); return; }
       if (!event.target.hasAttribute("data-copy-setup")) return;
@@ -533,14 +823,14 @@ grant execute on function public.delete_account() to authenticated;`;
           .catch(fallback);
       } else fallback();
     });
-    const onKey = (event) => {
-      if (event.key === "Escape") { close(); document.removeEventListener("keydown", onKey); }
+    onKey = (event) => {
+      if (event.key === "Escape") close();
     };
     document.addEventListener("keydown", onKey);
   }
 
   async function deleteAccount() {
-    if (!confirm("Delete your account and ALL cloud data? This cannot be undone.")) return;
+    if (!askConfirm("Delete your account and ALL cloud data? This cannot be undone.")) return;
     const btn = document.getElementById("deleteAccountBtn");
     if (btn) btn.disabled = true;
     suppressAuthHandling = true;
@@ -548,11 +838,15 @@ grant execute on function public.delete_account() to authenticated;`;
       const { error } = await sb.rpc("delete_account");
       if (error) throw error;
       await sb.auth.signOut();
+      cancelPendingSave();
       state = blank();
       currentUser = null;
+      lastAuthUserId = null;
       cloudReady = false;
-      showAuthScreen();
+      workspaceLoaded = false;
+      clearDraft();
       applySettings();
+      showAuthScreen();
       setAuthStatus("Account and all data deleted.", "ok");
     } catch (err) {
       const code = String((err && err.code) || "");
@@ -575,14 +869,21 @@ grant execute on function public.delete_account() to authenticated;`;
   async function resetPassword(email) {
     if (!email) throw new Error("Enter your email first.");
     setAuthStatus("Sending password reset email...");
-    const redirectTo = window.location.origin + window.location.pathname + "?type=recovery";
+    const redirect = new URL(window.location.href);
+    redirect.searchParams.delete("type");
+    redirect.searchParams.delete("code");
+    redirect.searchParams.delete("error");
+    redirect.searchParams.delete("error_description");
+    redirect.hash = "";
+    redirect.searchParams.set("type", "recovery");
+    const redirectTo = redirect.toString();
     const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo });
     if (error) throw error;
   }
 
   async function updatePassword(password, oldPassword) {
     if (!password || password.length < 6) throw new Error("New password must be at least 6 characters.");
-    if (oldPassword) {
+    if (oldPassword && currentUser && currentUser.email) {
       suppressAuthHandling = true;
       let signInError;
       try {
@@ -615,8 +916,10 @@ grant execute on function public.delete_account() to authenticated;`;
     const oauthError = searchParams.get("error_description") || hashParams.get("error_description")
       || searchParams.get("error") || hashParams.get("error");
     if (oauthError && !recoveryIntent) {
+      let readable = oauthError;
+      try { readable = decodeURIComponent(oauthError).replace(/\+/g, " "); } catch (_) {}
       showAuthScreen();
-      setAuthStatus(decodeURIComponent(oauthError).replace(/\+/g, " "), "warn");
+      setAuthStatus(readable, "warn");
       return;
     }
 
@@ -625,6 +928,8 @@ grant execute on function public.delete_account() to authenticated;`;
       if (suppressAuthHandling) return;
       if (event === "PASSWORD_RECOVERY" || (recoveryIntent && session)) { showRecovery("reset"); return; }
       if (recoveryIntent && !session) return;
+      if (event === "TOKEN_REFRESHED" || event === "USER_UPDATED") return;
+      if (event === "SIGNED_IN" && cloudReady && session && session.user.id === lastAuthUserId) return;
       handleSession(session);
     });
 
@@ -739,6 +1044,56 @@ grant execute on function public.delete_account() to authenticated;`;
     return num(product.stock) - reservedFor(product.id);
   }
 
+  function qtyByProduct(items) {
+    const map = new Map();
+    (items || []).forEach((item) => {
+      if (!item.productId) return;
+      map.set(item.productId, (map.get(item.productId) || 0) + num(item.qty));
+    });
+    return map;
+  }
+
+  function reservedExcluding(productId, orderId) {
+    return state.orders
+      .filter((o) => o.id !== orderId && PRE_DISPATCH.includes(o.status) && !o.cancelled)
+      .reduce((sum, o) => sum + (o.items || []).filter((i) => i.productId === productId).reduce((s, i) => s + num(i.qty), 0), 0);
+  }
+
+  function canConsumeProduct(productId, qty, orderId) {
+    if (qty <= 0 || !productId) return true;
+    const product = state.products.find((p) => p.id === productId);
+    if (!product) return true;
+    return num(product.stock) - reservedExcluding(productId, orderId) >= qty;
+  }
+
+  function canConsumeItems(items, orderId) {
+    return [...qtyByProduct(items).entries()].every(([id, qty]) => canConsumeProduct(id, qty, orderId));
+  }
+
+  function applyStockDelta(items, direction) {
+    qtyByProduct(items).forEach((qty, id) => {
+      const product = state.products.find((p) => p.id === id);
+      if (product) product.stock = num(product.stock) + direction * qty;
+    });
+  }
+
+  function canApplyConsumingEdit(oldItems, newItems, orderId) {
+    const oldMap = qtyByProduct(oldItems);
+    const newMap = qtyByProduct(newItems);
+    const ids = new Set([...oldMap.keys(), ...newMap.keys()]);
+    return [...ids].every((id) => canConsumeProduct(id, (newMap.get(id) || 0) - (oldMap.get(id) || 0), orderId));
+  }
+
+  function applyConsumingEdit(oldItems, newItems) {
+    const oldMap = qtyByProduct(oldItems);
+    const newMap = qtyByProduct(newItems);
+    const ids = new Set([...oldMap.keys(), ...newMap.keys()]);
+    ids.forEach((id) => {
+      const product = state.products.find((p) => p.id === id);
+      if (product) product.stock = num(product.stock) - ((newMap.get(id) || 0) - (oldMap.get(id) || 0));
+    });
+  }
+
   function lowProducts() {
     return state.products.filter((p) => availability(p) <= num(p.low, 3));
   }
@@ -748,7 +1103,12 @@ grant execute on function public.delete_account() to authenticated;`;
   }
 
   function todayCollections() {
-    return state.orders.reduce((sum, o) => sum + (o.payments || []).filter((p) => p.date === todayISO()).reduce((s, p) => s + num(p.amount), 0), 0);
+    const date = todayISO();
+    const fromOrders = state.orders.reduce((sum, o) =>
+      sum + (o.payments || []).filter((p) => p.date === date).reduce((s, p) => s + num(p.amount), 0), 0);
+    const unallocated = state.customers.reduce((sum, c) =>
+      sum + (c.payments || []).filter((p) => p.date === date).reduce((s, p) => s + num(p.amount), 0), 0);
+    return fromOrders + unallocated;
   }
 
   function pendingCustomers() {
@@ -776,8 +1136,14 @@ grant execute on function public.delete_account() to authenticated;`;
   function closeSidebar() { setSidebar(false); }
 
   function switchView(view) {
-    document.querySelectorAll(".view").forEach((v) => v.classList.toggle("active", v.id === "view-" + view));
-    document.querySelectorAll("[data-view]").forEach((b) => b.classList.toggle("active", b.dataset.view === view));
+    const target = APP_VIEWS.includes(view) ? view : "home";
+    document.querySelectorAll(".view").forEach((v) => v.classList.toggle("active", v.id === "view-" + target));
+    document.querySelectorAll("[data-view], [data-go]").forEach((b) => {
+      const active = (b.dataset.view || b.dataset.go) === target;
+      b.classList.toggle("active", active);
+      if (active) b.setAttribute("aria-current", "page");
+      else b.removeAttribute("aria-current");
+    });
     closeSidebar();
     window.scrollTo({ top: 0, behavior: "auto" });
   }
@@ -958,6 +1324,8 @@ grant execute on function public.delete_account() to authenticated;`;
   function resetOrderForm() {
     const form = document.getElementById("orderForm");
     form.reset();
+    const dateInput = document.getElementById("orderDate");
+    if (dateInput) dateInput.value = todayISO();
     document.getElementById("oDiscount").value = 0;
     document.getElementById("oDelivery").value = 0;
     document.getElementById("oPaid").value = 0;
@@ -1239,7 +1607,6 @@ grant execute on function public.delete_account() to authenticated;`;
       toast("Select a conversation first.", "warn");
       return;
     }
-    currentTemplate = kind;
     currentDraft = draftText(kind);
     document.getElementById("aiDraftText").textContent = currentDraft;
     document.getElementById("aiDraftBox").hidden = false;
@@ -1310,6 +1677,12 @@ grant execute on function public.delete_account() to authenticated;`;
       unit: document.getElementById("pUnit").value.trim() || "pc"
     };
     if (!data.name) return;
+    const duplicate = state.products.find((p) =>
+      p.name.toLowerCase() === data.name.toLowerCase() && p.id !== editingProduct);
+    if (duplicate) {
+      toast("A product with this name already exists.", "warn");
+      return;
+    }
     if (editingProduct) {
       const product = state.products.find((p) => p.id === editingProduct);
       if (product) Object.assign(product, data);
@@ -1319,6 +1692,7 @@ grant execute on function public.delete_account() to authenticated;`;
       toast("Product saved.");
     }
     selectedPriceIds = null;
+    clearPriceList();
     save();
     resetProductForm();
     renderAll();
@@ -1343,8 +1717,18 @@ grant execute on function public.delete_account() to authenticated;`;
       return;
     }
     const phone = document.getElementById("oPhone").value.trim();
-    if (cleanPhone(phone).length < 10) {
+    if (!validPhone(phone)) {
       toast("Enter a phone number with country code.", "warn");
+      return;
+    }
+    const oldItems = editingOrder ? [...(editingOrder.items || [])] : [];
+    if (editingOrder && STOCK_CONSUMING.includes(editingOrder.status)) {
+      if (!canApplyConsumingEdit(oldItems, items, editingOrder.id)) {
+        toast("Not enough available stock for these changes.", "warn");
+        return;
+      }
+    } else if (!canConsumeItems(items, editingOrder ? editingOrder.id : null)) {
+      toast("Not enough available stock for this order.", "warn");
       return;
     }
 
@@ -1374,6 +1758,7 @@ grant execute on function public.delete_account() to authenticated;`;
       phone,
       instagram: customer.instagram || "",
       source: document.getElementById("oSource").value,
+      date: dateField("orderDate"),
       items,
       discount: num(document.getElementById("oDiscount").value),
       delivery: num(document.getElementById("oDelivery").value),
@@ -1387,6 +1772,7 @@ grant execute on function public.delete_account() to authenticated;`;
     };
 
     if (editingOrder) {
+      if (STOCK_CONSUMING.includes(editingOrder.status)) applyConsumingEdit(oldItems, items);
       Object.assign(editingOrder, data);
       toast("Order updated.");
     } else {
@@ -1394,23 +1780,13 @@ grant execute on function public.delete_account() to authenticated;`;
         id: uid(),
         code: "SM-" + state.settings.nextCode++,
         status: "New",
-        date: todayISO(),
         dispatched: false,
         returned: false,
         cancelled: false
       }, data);
       state.orders.push(newOrder);
-      if (!state.chats[phone] || !state.chats[phone].length) {
-        state.chats[phone] = [{
-          from: "buyer",
-          text: uiText(
-            `Assalam o alaikum! I'd like to know more about ${items.map((i) => i.name).join(", ")}. Is it available?`,
-            `Hello! I'd like to know more about ${items.map((i) => i.name).join(", ")}. Is it available?`
-          ),
-          time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-        }];
-      }
-      toast("Order saved. Conversation ready.");
+      if (!state.chats[phone]) state.chats[phone] = [];
+      toast("Order saved.");
     }
     save();
     resetOrderForm();
@@ -1428,6 +1804,8 @@ grant execute on function public.delete_account() to authenticated;`;
     document.getElementById("oDiscount").value = num(order.discount);
     document.getElementById("oDelivery").value = num(order.delivery);
     document.getElementById("oPaid").value = 0;
+    const dateInput = document.getElementById("orderDate");
+    if (dateInput) dateInput.value = order.date || todayISO();
     document.getElementById("oDueDate").value = order.dueDate || "";
     document.getElementById("oCourier").value = order.courier || "";
     document.getElementById("oTracking").value = order.tracking || "";
@@ -1446,59 +1824,22 @@ grant execute on function public.delete_account() to authenticated;`;
 
   function changeStatus(id, next) {
     const order = state.orders.find((o) => o.id === id);
-    if (!order || order.status === next) return;
+    if (!order || order.status === next || !STATUSES.includes(next)) return;
     const previous = order.status;
-    const wasDispatched = !!order.dispatched;
+    const wasConsuming = STOCK_CONSUMING.includes(previous);
+    const willConsume = STOCK_CONSUMING.includes(next);
 
-    if (PRE_DISPATCH.includes(previous) && next === "Dispatched") {
-      for (const item of order.items || []) {
-        const product = state.products.find((p) => p.id === item.productId);
-        if (product) product.stock = Math.max(0, num(product.stock) - num(item.qty));
-      }
-      order.dispatched = true;
-    } else if (wasDispatched && PRE_DISPATCH.includes(next)) {
-      for (const item of order.items || []) {
-        const product = state.products.find((p) => p.id === item.productId);
-        if (product) product.stock = num(product.stock) + num(item.qty);
-      }
-      order.dispatched = false;
+    if (!wasConsuming && willConsume && !canConsumeItems(order.items, order.id)) {
+      toast("Not enough available stock for this order.", "warn");
+      renderOrders();
+      return;
     }
-
-    if (next === "Returned" && previous !== "Returned" && wasDispatched) {
-      for (const item of order.items || []) {
-        const product = state.products.find((p) => p.id === item.productId);
-        if (product) product.stock = num(product.stock) + num(item.qty);
-      }
-      order.dispatched = false;
-      order.returned = true;
-    } else if (previous === "Returned" && next !== "Returned") {
-      const enough = (order.items || []).every((item) => {
-        const product = state.products.find((p) => p.id === item.productId);
-        return !product || availability(product) >= num(item.qty);
-      });
-      if (!enough) {
-        toast("Not enough available stock to reverse this return.", "warn");
-        renderOrders();
-        return;
-      }
-      for (const item of order.items || []) {
-        const product = state.products.find((p) => p.id === item.productId);
-        if (product) product.stock = Math.max(0, num(product.stock) - num(item.qty));
-      }
-      order.dispatched = next !== "New" && next !== "Confirmed" && next !== "Packed";
-      order.returned = false;
-    }
-
-    if (next === "Cancelled" && wasDispatched && !order.returned && previous !== "Returned") {
-      for (const item of order.items || []) {
-        const product = state.products.find((p) => p.id === item.productId);
-        if (product) product.stock = num(product.stock) + num(item.qty);
-      }
-      order.dispatched = false;
-      order.returned = true;
-    }
+    if (wasConsuming && !willConsume) applyStockDelta(order.items, 1);
+    if (!wasConsuming && willConsume) applyStockDelta(order.items, -1);
 
     order.status = next;
+    order.dispatched = willConsume;
+    order.returned = next === "Returned";
     order.cancelled = next === "Cancelled";
     order.updatedAt = todayISO();
     save();
@@ -1626,12 +1967,16 @@ grant execute on function public.delete_account() to authenticated;`;
 <script>
 function copyInvoice() {
   var t = document.getElementById('invoiceText');
-  try {
-    navigator.clipboard.writeText(t.value).then(function () { alert('Invoice text copied.'); });
-  } catch (e) {
-    t.style.display = 'block'; t.select(); document.execCommand('copy'); t.style.display = 'none';
-    alert('Invoice text copied.');
-  }
+  var fallback = function () {
+    t.style.display = 'block'; t.focus(); t.select();
+    var done = false;
+    try { done = document.execCommand('copy'); } catch (e) {}
+    t.style.display = 'none';
+    alert(done ? 'Invoice text copied.' : 'Select the invoice text and copy it manually.');
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(t.value).then(function () { alert('Invoice text copied.'); }).catch(fallback);
+  } else fallback();
 }
 </script></body></html>`;
     const win = window.open("", "_blank");
@@ -1646,8 +1991,14 @@ function copyInvoice() {
   function saveCustomer(event) {
     event.preventDefault();
     const phone = document.getElementById("cPhone").value.trim();
-    if (cleanPhone(phone).length < 10) {
+    if (!validPhone(phone)) {
       toast("Enter a phone number with country code.", "warn");
+      return;
+    }
+    const duplicate = state.customers.find((c) =>
+      cleanPhone(c.phone) === cleanPhone(phone) && c.id !== editingCustomer);
+    if (duplicate) {
+      toast("A customer with this phone already exists.", "warn");
       return;
     }
     const data = {
@@ -1690,30 +2041,33 @@ function copyInvoice() {
   }
 
   function importBackup(file) {
+    const input = document.getElementById("restoreFile");
+    const finish = () => { if (input) input.value = ""; };
     const reader = new FileReader();
     reader.onload = () => {
       try {
         const data = JSON.parse(reader.result);
-        if (!Array.isArray(data.orders) || !Array.isArray(data.products) || !Array.isArray(data.customers) || !Array.isArray(data.expenses)) {
+        if (!data || typeof data !== "object" || !Array.isArray(data.products) ||
+            !Array.isArray(data.customers) || !Array.isArray(data.orders) || !Array.isArray(data.expenses)) {
           throw new Error("invalid");
         }
-        if (!confirm("Restore this backup? Current data will be replaced.")) return;
-        state = {
-          products: data.products,
-          customers: data.customers,
-          orders: data.orders,
-          expenses: data.expenses.map(normalizeExpense),
-          suppliers: Array.isArray(data.suppliers) ? data.suppliers.map(normalizeSupplier) : [],
-          chats: data.chats && typeof data.chats === "object" ? data.chats : {},
-          settings: normalizeSettings(data.settings)
-        };
+        const restored = normalizeState(data);
+        if (!askConfirm("Restore this backup? Current data will be replaced.")) return;
+        state = restored;
         activePhone = null;
         paymentOpenId = null;
         activeLedgerId = null;
         activeSupplierId = null;
+        editingSupplier = null;
+        editingProduct = editingOrder = editingCustomer = null;
         selectedPriceIds = null;
         selectedFollowups = new Set();
+        clearDraft();
+        clearPriceList();
         resetReportOutputs();
+        resetProductForm();
+        resetOrderForm();
+        resetCustomerForm();
         save();
         applySettings();
         renderReplyTemplates();
@@ -1721,9 +2075,12 @@ function copyInvoice() {
         toast("Backup restored.");
       } catch (error) {
         toast("That file is not a valid SellMate backup.", "warn");
+      } finally {
+        finish();
       }
-      document.getElementById("restoreFile").value = "";
     };
+    reader.onerror = () => { toast("Could not read that file.", "warn"); finish(); };
+    reader.onabort = () => { finish(); };
     reader.readAsText(file);
   }
 
@@ -1731,12 +2088,14 @@ function copyInvoice() {
     const lang = window.SellMateLang ? window.SellMateLang.get() : "ur";
     const english = lang === "en";
     document.querySelectorAll("[data-lang-code]").forEach((el) => { el.textContent = lang.toUpperCase(); });
+    const skip = document.querySelector(".skip-link");
+    if (skip) skip.textContent = uiText("Main par jayein", "Skip to main content");
     document.querySelectorAll("[data-lang-toggle]").forEach((btn) => {
-      const title = english
+      const action = english
         ? uiText("Roman Urdu par switch karein", "Switch to Roman Urdu")
         : uiText("English par switch karein", "Switch to English");
-      btn.setAttribute("title", title);
-      btn.setAttribute("aria-label", title);
+      btn.setAttribute("title", action);
+      btn.setAttribute("aria-label", lang.toUpperCase() + " — " + action);
     });
     const placeholders = {
       pName: ["e.g. Blue kurta", "e.g. Blue shirt"],
@@ -1757,11 +2116,14 @@ function copyInvoice() {
       state.settings.language = lang;
       save();
     }
+    const appShell = document.getElementById("appShell");
+    if (appShell && !appShell.hidden) renderAll();
   }
 
   function applySettings() {
     syncLanguageControls();
-    const light = state.settings.theme === "light";
+    const theme = readThemePreference() || state.settings.theme;
+    const light = theme !== "dark";
     document.documentElement.dataset.theme = light ? "light" : "dark";
     const themeMeta = document.querySelector('meta[name="theme-color"]');
     if (themeMeta) themeMeta.content = light ? "#fbf8f1" : "#050605";
@@ -1770,7 +2132,9 @@ function copyInvoice() {
     document.getElementById("shopChip").textContent = shop;
     const acct = document.getElementById("accountName"); if (acct) acct.textContent = shop;
     const hour = new Date().getHours();
-    const greet = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+    const greet = hour < 12
+      ? uiText("Good morning", "Good morning")
+      : hour < 17 ? uiText("Good afternoon", "Good afternoon") : uiText("Good evening", "Good evening");
     document.getElementById("greeting").textContent = greet + ", " + shop;
     document.getElementById("todayLabel").textContent = new Date().toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
   }
@@ -1894,7 +2258,7 @@ function copyInvoice() {
       toast("Select customers in the follow-up queue first.", "warn");
       return;
     }
-    if (orders.length > 3 && !confirm("Open WhatsApp for " + orders.length + " customers? Allow pop-ups if your browser asks.")) return;
+    if (orders.length > 3 && !askConfirm("Open WhatsApp for " + orders.length + " customers? Allow pop-ups if your browser asks.")) return;
     orders.forEach((o) => openWhatsAppTo(o.phone, reminderForOrder(o)));
     toast("Opening " + orders.length + " WhatsApp chat" + (orders.length === 1 ? "" : "s") + ".");
   }
@@ -1902,9 +2266,7 @@ function copyInvoice() {
   function openChatForPhone(phone) {
     if (!phone) return;
     activePhone = phone;
-    currentDraft = "";
-    document.getElementById("aiDraftBox").hidden = true;
-    document.querySelectorAll("#templateBar .mini-btn").forEach((b) => b.classList.remove("active"));
+    clearDraft();
     renderThreads();
     renderChat();
     switchView("chat");
@@ -2274,7 +2636,7 @@ function copyInvoice() {
   function deleteSupplier() {
     const supplier = activeSupplierId ? state.suppliers.find((s) => s.id === activeSupplierId) : null;
     if (!supplier) return;
-    if (!confirm(uiText(
+    if (!askConfirm(uiText(
       "Delete " + supplier.name + " and their khata entries?",
       "Delete " + supplier.name + " and their ledger entries?"
     ))) return;
@@ -2496,7 +2858,7 @@ function copyInvoice() {
   }
 
   function resetReplies() {
-    if (!confirm("Reset all custom replies to the built-in wording?")) return;
+    if (!askConfirm("Reset all custom replies to the built-in wording?")) return;
     state.settings.replies = {};
     save();
     renderReplyTemplates();
@@ -2560,7 +2922,7 @@ function copyInvoice() {
       e.preventDefault();
       const btn = document.getElementById("loginBtn"); btn.disabled = true;
       try { await signInWithPassword(document.getElementById("loginEmail").value.trim(), document.getElementById("loginPassword").value); setAuthStatus(""); }
-      catch (err) { setAuthStatus(err.message || "Login failed.", "warn"); } finally { btn.disabled = false; }
+      catch (err) { setAuthStatus(friendlyError(err, "Login failed."), "warn"); } finally { btn.disabled = false; }
     });
     document.getElementById("signupForm").addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -2569,33 +2931,37 @@ function copyInvoice() {
         const result = await signUpWithPassword(document.getElementById("signupEmail").value.trim(), document.getElementById("signupPassword").value, document.getElementById("signupShop").value.trim());
         if (result === "confirm-email") setAuthStatus("Account created. Check your email to confirm, then log in.", "ok");
         else setAuthStatus("");
-      } catch (err) { setAuthStatus(err.message || "Signup failed.", "warn"); } finally { btn.disabled = false; }
+      } catch (err) { setAuthStatus(friendlyError(err, "Signup failed."), "warn"); } finally { btn.disabled = false; }
     });
-    document.getElementById("googleAuthBtn").addEventListener("click", async () => { try { await signInWithGoogle(); } catch (err) { setAuthStatus(err.message || "Google sign-in failed.", "warn"); } });
+    document.getElementById("googleAuthBtn").addEventListener("click", async () => { try { await signInWithGoogle(); } catch (err) { setAuthStatus(friendlyError(err, "Google sign-in failed."), "warn"); } });
     document.getElementById("phoneAuthBtn").addEventListener("click", () => { authTab("phone"); document.getElementById("phoneNumber").focus(); });
+    document.getElementById("phoneNumber").addEventListener("input", () => {
+      pendingPhone = null;
+      document.getElementById("otpBox").hidden = true;
+    });
     document.getElementById("phoneForm").addEventListener("submit", async (e) => {
       e.preventDefault();
       const btn = document.getElementById("sendCodeBtn"); btn.disabled = true;
       try { await sendPhoneCode(); }
-      catch (err) { setAuthStatus(err.message || "Could not send SMS code.", "warn"); }
+      catch (err) { setAuthStatus(friendlyError(err, "Could not send SMS code."), "warn"); }
       finally { btn.disabled = false; }
     });
     document.getElementById("verifyOtpBtn").addEventListener("click", async () => {
       const btn = document.getElementById("verifyOtpBtn"); btn.disabled = true;
       try { await verifyPhoneCode(); }
-      catch (err) { setAuthStatus(err.message || "Could not verify code.", "warn"); }
+      catch (err) { setAuthStatus(friendlyError(err, "Could not verify code."), "warn"); }
       finally { btn.disabled = false; }
     });
     document.getElementById("resendCodeBtn").addEventListener("click", async () => {
       const btn = document.getElementById("resendCodeBtn"); btn.disabled = true;
       try { await sendPhoneCode(); }
-      catch (err) { setAuthStatus(err.message || "Could not resend code.", "warn"); }
+      catch (err) { setAuthStatus(friendlyError(err, "Could not resend code."), "warn"); }
       finally { btn.disabled = false; }
     });
     document.getElementById("forgotPasswordBtn").addEventListener("click", async () => {
       const email = document.getElementById("loginEmail").value.trim();
       try { await resetPassword(email); setAuthStatus("Password reset email sent. Check your inbox/spam.", "ok"); }
-      catch (err) { setAuthStatus(err.message || "Could not send reset email.", "warn"); }
+      catch (err) { setAuthStatus(friendlyError(err, "Could not send reset email."), "warn"); }
     });
     document.getElementById("recoveryForm").addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -2610,7 +2976,7 @@ function copyInvoice() {
         if (currentUser && sb) { showAppShell(); applySettings(); renderAll(); }
       } catch (err) {
         if (wasRecovery) recoveryIntent = true;
-        setAuthStatus(err.message || "Could not update password.", "warn");
+        setAuthStatus(friendlyError(err, "Could not update password. Check your sign-in method and try again."), "warn");
       } finally { btn.disabled = false; }
     });
     document.querySelectorAll("[data-toggle-password]").forEach((btn) => {
@@ -2627,7 +2993,7 @@ function copyInvoice() {
     document.getElementById("recoveryCancelBtn").addEventListener("click", cancelRecovery);
     document.getElementById("logoutBtn").addEventListener("click", async () => {
       const btn = document.getElementById("logoutBtn"); btn.disabled = true;
-      try { await signOut(); } catch (err) { toast(err.message || "Logout failed.", "warn"); } finally { btn.disabled = false; }
+      try { await signOut(); } catch (err) { toast(friendlyError(err, "Logout failed."), "warn"); } finally { btn.disabled = false; }
     });
     document.getElementById("deleteAccountBtn").addEventListener("click", deleteAccount);
 
@@ -2660,6 +3026,7 @@ function copyInvoice() {
 
     document.getElementById("themeBtn").addEventListener("click", () => {
       state.settings.theme = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+      try { localStorage.setItem(THEME_KEY, state.settings.theme); } catch (_) {}
       save();
       applySettings();
     });
@@ -2669,15 +3036,18 @@ function copyInvoice() {
     document.getElementById("restoreBtn").addEventListener("click", () => document.getElementById("restoreFile").click());
     document.getElementById("restoreFile").addEventListener("change", (e) => e.target.files[0] && importBackup(e.target.files[0]));
     document.getElementById("resetBtn").addEventListener("click", () => {
-      if (!confirm("Reset this workspace? This clears your cloud data for this account.")) return;
+      if (!askConfirm("Reset this workspace? This clears your cloud data for this account.")) return;
       state = blank();
       activePhone = null;
       paymentOpenId = null;
       activeLedgerId = null;
       activeSupplierId = null;
       editingSupplier = null;
+      editingProduct = editingOrder = editingCustomer = null;
       selectedPriceIds = null;
       selectedFollowups = new Set();
+      clearDraft();
+      clearPriceList();
       resetReportOutputs();
       renderReplyTemplates();
       resetProductForm();
@@ -2732,7 +3102,7 @@ function copyInvoice() {
         return;
       }
       if (del) {
-        if (!confirm("Delete this product? Existing orders keep their item details.")) return;
+        if (!askConfirm("Delete this product? Existing orders keep their item details.")) return;
         state.products = state.products.filter((p) => p.id !== del);
         selectedPriceIds = null;
         save();
@@ -2794,17 +3164,10 @@ function copyInvoice() {
       if (repeat) { startRepeatOrder(state.orders.find((o) => o.id === repeat)); return; }
       if (edit) { startOrderEdit(edit); return; }
       if (invoice) { openInvoice(invoice); return; }
-      if (message) {
-        activePhone = message;
-        document.getElementById("aiDraftBox").hidden = true;
-        renderThreads();
-        renderChat();
-        switchView("chat");
-        return;
-      }
+      if (message) { openChatForPhone(message); return; }
       if (add) { addPayment(add); return; }
       if (remove) {
-        if (!confirm("Remove this payment entry?")) return;
+        if (!askConfirm("Remove this payment entry?")) return;
         const order = state.orders.find((o) => o.id === event.target.dataset.orderId);
         if (order) {
           order.payments = order.payments.filter((p) => p.id !== remove);
@@ -2815,13 +3178,10 @@ function copyInvoice() {
         return;
       }
       if (del) {
-        if (!confirm("Delete this order? Stock and payments recorded for it will also be removed from the app.")) return;
+        if (!askConfirm("Delete this order? Stock and payments recorded for it will also be removed from the app.")) return;
         const order = state.orders.find((o) => o.id === del);
-        if (order && order.dispatched && !order.returned) {
-          for (const item of order.items || []) {
-            const product = state.products.find((p) => p.id === item.productId);
-            if (product) product.stock = num(product.stock) + num(item.qty);
-          }
+        if (order && STOCK_CONSUMING.includes(order.status)) {
+          applyStockDelta(order.items, 1);
         }
         state.orders = state.orders.filter((o) => o.id !== del);
         save();
@@ -2841,14 +3201,7 @@ function copyInvoice() {
       const edit = target.dataset.customerEdit;
       const del = target.dataset.customerDelete;
 
-      if (message) {
-        activePhone = message;
-        document.getElementById("aiDraftBox").hidden = true;
-        renderThreads();
-        renderChat();
-        switchView("chat");
-        return;
-      }
+      if (message) { openChatForPhone(message); return; }
       if (ledger) {
         if (!state.customers.some((c) => c.id === ledger)) return;
         activeLedgerId = ledger;
@@ -2897,7 +3250,7 @@ function copyInvoice() {
           toast("This customer has orders. Delete the orders first.", "warn");
           return;
         }
-        if (!confirm("Delete this customer?")) return;
+        if (!askConfirm("Delete this customer?")) return;
         state.customers = state.customers.filter((c) => c.id !== del);
         if (activeLedgerId === del) activeLedgerId = null;
         save();
@@ -2913,9 +3266,7 @@ function copyInvoice() {
       const button = event.target.closest("[data-thread]");
       if (!button) return;
       activePhone = button.dataset.thread;
-      currentDraft = "";
-      document.getElementById("aiDraftBox").hidden = true;
-      document.querySelectorAll("#templateBar .mini-btn").forEach((b) => b.classList.remove("active"));
+      clearDraft();
       renderThreads();
       renderChat();
     });
@@ -2926,7 +3277,7 @@ function copyInvoice() {
     document.getElementById("toggleReplyPaste").addEventListener("click", () => {
       const body = document.getElementById("replyPasteBody");
       body.hidden = !body.hidden;
-      document.getElementById("toggleReplyPaste").textContent = body.hidden ? "Open" : "Close";
+      document.getElementById("toggleReplyPaste").textContent = uiText(body.hidden ? "Kholen" : "Band karein", body.hidden ? "Open" : "Close");
     });
     document.getElementById("makePasteReply").addEventListener("click", preparePasteReply);
     document.getElementById("clearPasteReply").addEventListener("click", () => {
@@ -2956,16 +3307,14 @@ function copyInvoice() {
       if (!input.value.trim()) return;
       addMessage("seller", input.value);
       input.value = "";
-      currentDraft = "";
-      document.getElementById("aiDraftBox").hidden = true;
-      document.querySelectorAll("#templateBar .mini-btn").forEach((b) => b.classList.remove("active"));
+      clearDraft();
     });
 
     /* Paste-from-chat order builder */
     document.getElementById("togglePaste").addEventListener("click", () => {
       const body = document.getElementById("pasteBody");
       body.hidden = !body.hidden;
-      document.getElementById("togglePaste").textContent = body.hidden ? "Open" : "Close";
+      document.getElementById("togglePaste").textContent = uiText(body.hidden ? "Kholen" : "Band karein", body.hidden ? "Open" : "Close");
     });
     document.getElementById("parsePaste").addEventListener("click", parseBuyerMessage);
     document.getElementById("clearPaste").addEventListener("click", () => {
@@ -3059,13 +3408,14 @@ function copyInvoice() {
       toast("Day Book generated.");
     });
     document.getElementById("copyDayBook").addEventListener("click", () => copyReportText(dayBookText, "Day Book"));
-    document.getElementById("priceOnlyAvailable").addEventListener("change", renderPriceProducts);
+    document.getElementById("priceOnlyAvailable").addEventListener("change", () => { clearPriceList(); renderPriceProducts(); });
     document.getElementById("priceProducts").addEventListener("change", (event) => {
       const id = event.target.dataset.priceProduct;
       if (!id) return;
       if (!selectedPriceIds) selectedPriceIds = new Set();
       if (event.target.checked) selectedPriceIds.add(id);
       else selectedPriceIds.delete(id);
+      clearPriceList();
     });
     document.getElementById("generatePriceList").addEventListener("click", () => {
       if (generatePriceListText()) toast("Price list generated.");
@@ -3097,13 +3447,16 @@ function copyInvoice() {
     /* Expenses */
     document.getElementById("expenseForm").addEventListener("submit", (event) => {
       event.preventDefault();
+      const date = dateField("expenseDate");
       state.expenses.push({
         id: uid(), name: document.getElementById("eName").value.trim(),
-        amount: num(document.getElementById("eAmount").value), date: todayISO(),
+        amount: num(document.getElementById("eAmount").value), date,
         category: document.getElementById("eCategory").value
       });
       save();
       event.target.reset();
+      const dateInput = document.getElementById("expenseDate");
+      if (dateInput) dateInput.value = todayISO();
       renderAll();
       toast("Expense saved.");
     });
@@ -3117,9 +3470,25 @@ function copyInvoice() {
   }
 
   /* ---------- Start ---------- */
+  window.addEventListener("beforeunload", () => { flushSave(); });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") flushSave();
+  });
+  if ("BroadcastChannel" in window) {
+    workspaceChannel = new BroadcastChannel("sellmate-workspace");
+    workspaceChannel.addEventListener("message", async (event) => {
+      const data = event.data || {};
+      if (!currentUser || !cloudReady || data.userId !== currentUser.id || saving) return;
+      try {
+        await loadCloudState(currentUser);
+        renderAll();
+        toast("Workspace synced from another tab.", "ok");
+      } catch (_) {}
+    });
+  }
   if ("serviceWorker" in navigator && (location.protocol === "https:" || location.protocol === "http:")) {
     window.addEventListener("load", () => {
-      navigator.serviceWorker.register("./sw.js").catch((error) => console.warn("SellMate: service worker unavailable", error));
+      navigator.serviceWorker.register("./sw.js").catch(() => console.warn("SellMate: service worker unavailable"));
     });
   }
 
@@ -3129,13 +3498,30 @@ function copyInvoice() {
   const ed = document.getElementById("expenseDate"); if (ed) ed.value = todayISO();
   const rd = document.getElementById("reportDate"); if (rd) rd.value = todayISO();
   const im = document.getElementById("insightMonth"); if (im) im.value = todayISO().slice(0, 7);
-  initCloud();
+  initCloud().catch((error) => {
+    console.warn("SellMate startup failed");
+    showAuthScreen();
+    setAuthStatus(friendlyError(error, "Could not start the cloud connection."), "warn");
+  });
 
   /* Bridge used by the free offline help assistant (help-chat.js). */
   window.SellMateHelp = {
     openView: switchView,
     exportBackup: exportBackup,
-    changePassword: () => showRecovery("change"),
+    changePassword: () => {
+      if (!currentUser) {
+        authTab("login");
+        showAuthScreen();
+        setAuthStatus("Sign in first, then change your password.", "warn");
+        return;
+      }
+      showRecovery("change");
+    },
+    isSignedIn: () => !!currentUser,
+    showAuth: (tab) => {
+      authTab(tab === "signup" ? "signup" : "login");
+      showAuthScreen();
+    },
     currentView: () => {
       const active = document.querySelector(".view.active");
       return active ? active.id.replace("view-", "") : "home";

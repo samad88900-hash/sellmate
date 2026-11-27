@@ -234,7 +234,7 @@
   "chats": {},
   "settings": {
     "shopName": "Test Shop",
-    "theme": "dark",
+    "theme": "light",
     "nextCode": 1005,
     "lastBackupAt": null,
     "backupSnoozedAt": null,

@@ -83,7 +83,7 @@
     },
     {
       id: "new-order",
-      keys: ["order", "new order", "order banayein", "sale", "bill banayein"],
+      keys: ["order", "new order", "order banayein", "sale", "bill banayein", "order bill"],
       q: "Order kaise banayein?",
       a: "Orders view → 'New order'. Customer name/phone likho, item add karo, paid amount daalo aur 'Save order' dabao. Har order ko apna code milta hai.",
       view: "orders"
@@ -104,7 +104,7 @@
     },
     {
       id: "invoice",
-      keys: ["invoice", "bill", "print", "pdf", "slip", "receipt", "printable"],
+      keys: ["invoice", "customer bill", "bill print", "print", "pdf", "slip", "receipt", "printable"],
       q: "Invoice ya PDF kaise nikalein?",
       a: "Orders view me us order ke paas 'Invoice' dabao. Nayi window me clean invoice khulegi — 'Print / Save PDF' se PDF save kar sakte ho ya 'Copy text' se text copy kar lo.",
       view: "orders"
@@ -125,7 +125,7 @@
     },
     {
       id: "supplier",
-      keys: ["supplier", "bill", "payable", "supplier khata", "wholesale"],
+      keys: ["supplier", "supplier bill", "supplier ka bill", "supplier payment", "payable", "supplier khata", "wholesale"],
       q: "Supplier ka bill/payment kaise record karein?",
       a: "More → Suppliers. Supplier add karo, phir uske ledger me 'Add bill' ya 'Record payment' dabao. 'Payable' amount wahin dikhta hai.",
       view: "more"
@@ -139,7 +139,7 @@
     },
     {
       id: "backup",
-      keys: ["backup", "download", "save data", "export backup", "json"],
+      keys: ["backup", "download", "backup download", "save data", "export backup", "json"],
       q: "Backup kaise download karein?",
       a: "Upar right me download icon (⇩) ya More → Shop settings → 'Restore backup' ke paas backup option. Pure data JSON file me download hota hai.",
       action: "backup"
@@ -167,7 +167,7 @@
     },
     {
       id: "csv",
-      keys: ["csv", "excel", "export", "accounting", "tax"],
+      keys: ["csv", "excel", "csv export", "export csv", "download csv", "csv download", "accounting", "tax"],
       q: "CSV export kahan hai?",
       a: "More → CSV export. Orders, Payments, Customers, Products aur Suppliers ki alag-alag CSV files milti hain.",
       view: "more"
@@ -208,6 +208,27 @@
       view: "home"
     },
     {
+      id: "change-language",
+      keys: ["language", "language toggle", "zabaan", "zabaan badlein", "english", "roman urdu", "en ur"],
+      q: "Zabaan kaise badlein?",
+      a: "Upar right (ya login screen par) 'EN/UR' language toggle dabao. Har dabane par Roman Urdu aur English ke beech switch hota hai. Help panel bhi nayi zabaan me reset ho jata hai.",
+      action: "language"
+    },
+    {
+      id: "privacy",
+      keys: ["privacy", "privacy policy", "data privacy", "private data", "garima"],
+      q: "Privacy page kahan hai?",
+      a: "Login screen ke niche 'Privacy' link se privacy.html khulti hai. Usme bataya hai ki tumhara data kaise store aur protect hota hai.",
+      action: "privacy"
+    },
+    {
+      id: "terms",
+      keys: ["terms", "terms of service", "terms and conditions", "shartain"],
+      q: "Terms page kahan hai?",
+      a: "Login screen ke niche 'Terms' link se terms.html khulti hai. Usme app use karne ki simple shartain likhi hain.",
+      action: "terms"
+    },
+    {
       id: "support",
       keys: ["support", "help", "contact", "email", "issue", "problem"],
       q: "Aur madad chahiye?",
@@ -228,7 +249,7 @@
   window.SELLMATE_HELP_KB_EN = [
     {
       id: "login",
-      keys: ["login", "log in", "sign in", "email password", "forgot password", "access account"],
+      keys: ["login", "log in", "sign in", "email password", "access account", "sign in screen"],
       q: "How do I log in?",
       a: "Keep the Log in tab selected. Enter your email and password, then tap Log in. If you forgot your password, use Forgot password? to get a reset link.",
       view: "login"
@@ -305,7 +326,7 @@
     },
     {
       id: "new-order",
-      keys: ["order", "new order", "sale", "create order", "bill"],
+      keys: ["order", "new order", "sale", "create order", "create bill", "order bill"],
       q: "How do I create an order?",
       a: "Open Orders and tap New order. Enter the customer name and phone, add items, enter the paid amount, then tap Save order. Every order gets its own code.",
       view: "orders"
@@ -326,7 +347,7 @@
     },
     {
       id: "invoice",
-      keys: ["invoice", "bill", "print", "pdf", "slip", "receipt", "printable"],
+      keys: ["invoice", "bill", "customer bill", "bill print", "print", "pdf", "slip", "receipt", "printable"],
       q: "How do I print an invoice?",
       a: "In Orders, tap Invoice on the order. A clean invoice opens in a new tab — use Print / Save PDF or Copy text.",
       view: "orders"
@@ -361,7 +382,7 @@
     },
     {
       id: "backup",
-      keys: ["backup", "download", "export", "json", "save data"],
+      keys: ["backup", "download", "backup download", "export backup", "json", "save data"],
       q: "How do I download a backup?",
       a: "Use the download icon (⇩) at the top right, or go to More → Shop settings near Restore backup. Your whole dataset downloads as a JSON file.",
       action: "backup"
@@ -389,7 +410,7 @@
     },
     {
       id: "csv",
-      keys: ["csv", "excel", "export", "accounting", "tax"],
+      keys: ["csv", "excel", "csv export", "export csv", "download csv", "csv download", "accounting", "tax"],
       q: "Where is CSV export?",
       a: "Go to More → CSV export. You get separate CSV files for Orders, Payments, Customers, Products, and Suppliers.",
       view: "more"
@@ -428,6 +449,27 @@
       q: "Where is navigation on mobile?",
       a: "On mobile, use the bottom nav: Home, Products, Orders, Customers, and Chat. The ☰ button also opens the sidebar.",
       view: "home"
+    },
+    {
+      id: "change-language",
+      keys: ["language", "language toggle", "change language", "switch language", "english", "roman urdu", "en ur"],
+      q: "How do I change the language?",
+      a: "Tap the EN/UR language toggle at the top right (or on the sign-in screen). Each tap switches between Roman Urdu and English. The help panel also resets in the new language.",
+      action: "language"
+    },
+    {
+      id: "privacy",
+      keys: ["privacy", "privacy policy", "data privacy", "private data"],
+      q: "Where is the Privacy page?",
+      a: "Open the Privacy link below the sign-in form, or open privacy.html in the app. It explains how your data is stored and protected.",
+      action: "privacy"
+    },
+    {
+      id: "terms",
+      keys: ["terms", "terms of service", "terms and conditions", "conditions"],
+      q: "Where is the Terms page?",
+      a: "Open the Terms link below the sign-in form, or open terms.html in the app. It lists the simple terms for using SellMate.",
+      action: "terms"
     },
     {
       id: "support",

@@ -2,6 +2,8 @@
 
 Google login code is ready in the app. To make it work, Google OAuth credentials must be connected to Supabase.
 
+> **Status: not publicly launched.** Credentials and branding are still pending, and public launch is blocked until a custom domain is connected and Google brand verification is complete. Keep this to testing only; do not present Google sign-in as available to users. Email/password and phone OTP are the sign-in options for now.
+
 > Never put the Google **Client secret** in this repo or in `supabase-config.js`. It belongs only in the Supabase dashboard.
 
 ## 1. Google Cloud Console
@@ -46,7 +48,7 @@ Google login code is ready in the app. To make it work, Google OAuth credentials
    http://localhost:5500
    ```
 
-## 3. Test
+## 3. Test (internal only — not a public launch)
 
 1. Open https://sellmate-draft.netlify.app
 2. Click **Continue with Google**.
@@ -55,6 +57,6 @@ Google login code is ready in the app. To make it work, Google OAuth credentials
 
 ## Notes
 
-- If you add a custom domain later, add that domain to Google **Authorized JavaScript origins** and Supabase **Redirect URLs** too.
+- A custom domain plus Google **brand verification** must be completed before this can be offered publicly; also add the domain to Google **Authorized JavaScript origins** and Supabase **Redirect URLs**.
 - Email/password login and password reset are independent of Google and keep working.
 - Each Google account gets its own private workspace via Supabase RLS.

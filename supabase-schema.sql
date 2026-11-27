@@ -1,8 +1,6 @@
 -- SellMate Option B: Supabase schema (fresh start, per-user cloud workspace)
 -- Run in Supabase SQL Editor.
 
-create extension if not exists pgcrypto;
-
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   shop_name text not null default 'My Shop',
@@ -25,7 +23,7 @@ create policy "profiles_select_own" on public.profiles for select using (auth.ui
 drop policy if exists "profiles_insert_own" on public.profiles;
 create policy "profiles_insert_own" on public.profiles for insert with check (auth.uid() = id);
 drop policy if exists "profiles_update_own" on public.profiles;
-create policy "profiles_update_own" on public.profiles for update using (auth.uid() = id);
+create policy "profiles_update_own" on public.profiles for update using (auth.uid() = id) with check (auth.uid() = id);
 
 drop policy if exists "workspaces_select_own" on public.workspaces;
 create policy "workspaces_select_own" on public.workspaces for select using (auth.uid() = user_id);
@@ -50,6 +48,10 @@ begin
   return new;
 end;
 $$;
+
+-- Trigger functions do not need public/anon execute at signup time.
+revoke execute on function public.handle_new_user() from public, anon;
+grant execute on function public.handle_new_user() to authenticated;
 
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created

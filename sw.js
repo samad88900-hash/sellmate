@@ -1,5 +1,6 @@
 /* SellMate service worker — offline cache for the app shell. */
-const CACHE = "sellmate-v55";
+const CACHE = "sellmate-v56";
+const SUPABASE_JS = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js";
 const ASSETS = [
   "./",
   "./index.html",
@@ -37,17 +38,34 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return;
 
   const url = new URL(request.url);
+
+  if (url.href === SUPABASE_JS) {
+    event.respondWith(
+      caches.match(request).then((hit) => hit || fetch(request).then((response) => {
+        if (response.ok) {
+          const copy = response.clone();
+          caches.open(CACHE).then((cache) => cache.put(request, copy));
+        }
+        return response;
+      }))
+    );
+    return;
+  }
+
   if (url.origin !== self.location.origin) return;
 
   if (request.mode === "navigate") {
+    const appShell = url.pathname === "/" || url.pathname.endsWith("/index.html");
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE).then((cache) => cache.put("./index.html", copy));
+          if (response.ok && appShell) {
+            const copy = response.clone();
+            caches.open(CACHE).then((cache) => cache.put("./index.html", copy));
+          }
           return response;
         })
-        .catch(() => caches.match("./index.html"))
+        .catch(() => caches.match(request).then((hit) => hit || caches.match("./index.html")))
     );
     return;
   }
