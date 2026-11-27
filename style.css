@@ -87,7 +87,7 @@ html[data-theme="dark"] {
 [hidden] { display: none !important; }
 html { scroll-behavior: auto; }
 [id] { scroll-margin-top: 124px; }
-html { touch-action: manipulation; }
+html, body { touch-action: pan-x pan-y; }
 
 body {
   min-height: 100vh;
@@ -103,7 +103,7 @@ button, input, select, textarea {
   font: inherit;
   color: inherit;
   min-height: 44px;
-  touch-action: manipulation;
+  touch-action: pan-x pan-y;
 }
 button { cursor: pointer; }
 ::selection { background: var(--accent-line); }
