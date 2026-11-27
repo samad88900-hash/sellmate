@@ -2190,8 +2190,8 @@ function copyInvoice() {
     document.querySelectorAll("[data-lang-code]").forEach((el) => { el.textContent = lang.toUpperCase(); });
     const skip = document.querySelector(".skip-link");
     if (skip) skip.textContent = uiText("Main par jayein", "Skip to main content");
-    const guestBtn = document.getElementById("guestAuthBtn");
-    if (guestBtn) guestBtn.textContent = uiText("Guest ke taur par dekhein", "Continue as guest");
+    const guestLabel = document.querySelector("[data-guest-label]");
+    if (guestLabel) guestLabel.textContent = uiText("Guest ke taur par dekhein", "Continue as guest");
     const guestNote = document.getElementById("guestNote");
     if (guestNote) guestNote.textContent = uiText("Account ki zarurat nahi — demo data isi tab me rahega.", "No account needed — demo data stays in this tab.");
     const guestChip = document.getElementById("guestChip");
