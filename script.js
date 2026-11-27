@@ -475,13 +475,23 @@ $$;
 revoke all on function public.delete_account() from public, anon;
 grant execute on function public.delete_account() to authenticated;`;
 
+  const OWNER_EMAIL = "samad88900@gmail.com";
+
+  function isOwnerContext() {
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.get("setup") === "delete" || url.hash === "#delete-setup") return true;
+    } catch (_) {}
+    return String((currentUser && currentUser.email) || "").toLowerCase() === OWNER_EMAIL;
+  }
+
   function showDeleteSetup() {
     if (document.querySelector(".setup-modal")) return;
     const box = document.createElement("div");
     box.className = "setup-modal";
     box.innerHTML = `<div class="setup-card">
-      <h3>Supabase setup needed</h3>
-      <p>Delete account chalane ke liye Supabase me ek chhota function banana padega. Neeche wali SQL copy karke <strong>Supabase → SQL Editor → New query → Run</strong> kar do. Uske baad yahi button kaam karega.</p>
+      <h3>One-time owner setup</h3>
+      <p>Ye sirf app owner ke liye hai. <strong>Ek dafa</strong> ye SQL <strong>Supabase → SQL Editor → New query → Run</strong> kar do. Uske baad kisi bhi user ko ye screen nahi dikhegi — sab sirf button dabayenge.</p>
       <textarea readonly spellcheck="false">${esc(DELETE_ACCOUNT_SQL)}</textarea>
       <div class="row-actions">
         <button class="btn primary" type="button" data-copy-setup>Copy SQL</button>
@@ -529,10 +539,14 @@ grant execute on function public.delete_account() to authenticated;`;
       applySettings();
       setAuthStatus("Account and all data deleted.", "ok");
     } catch (err) {
+      const code = String((err && err.code) || "");
       const message = String((err && err.message) || "");
-      if (/delete_account/i.test(message) && /function/i.test(message)) {
+      const missingFunction = code === "PGRST202" || /Could not find the function/i.test(message);
+      if (missingFunction && isOwnerContext()) {
         showDeleteSetup();
-        toast("Delete function missing in Supabase. SQL ready to copy.", "warn");
+        toast("Owner setup pending. SQL ready to copy.", "warn");
+      } else if (missingFunction) {
+        toast("Account deletion is temporarily unavailable. Please contact " + OWNER_EMAIL + ".", "warn");
       } else {
         toast(message || "Could not delete account.", "warn");
       }
