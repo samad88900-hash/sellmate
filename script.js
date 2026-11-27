@@ -1730,13 +1730,18 @@ function copyInvoice() {
   function syncLanguageControls() {
     const lang = window.SellMateLang ? window.SellMateLang.get() : "ur";
     const english = lang === "en";
-    document.querySelectorAll("[data-lang-code]").forEach((el) => { el.textContent = lang.toUpperCase(); });
+    document.querySelectorAll("[data-lang-label]").forEach((el) => { el.textContent = english ? "Roman Urdu" : "English"; });
     document.querySelectorAll("[data-lang-toggle]").forEach((btn) => {
       const title = english
         ? uiText("Roman Urdu par switch karein", "Switch to Roman Urdu")
         : uiText("English par switch karein", "Switch to English");
       btn.setAttribute("title", title);
       btn.setAttribute("aria-label", title);
+    });
+    document.querySelectorAll("[data-lang-option]").forEach((btn) => {
+      const active = btn.dataset.langOption === lang;
+      btn.classList.toggle("active", active);
+      btn.setAttribute("aria-pressed", String(active));
     });
     const placeholders = {
       pName: ["e.g. Blue kurta", "e.g. Blue shirt"],
@@ -2654,6 +2659,11 @@ function copyInvoice() {
       btn.addEventListener("click", () => {
         if (!window.SellMateLang) return;
         window.SellMateLang.set(window.SellMateLang.isEnglish() ? "ur" : "en");
+      });
+    });
+    document.querySelectorAll("[data-lang-option]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        if (window.SellMateLang) window.SellMateLang.set(btn.dataset.langOption);
       });
     });
     if (window.SellMateLang) window.SellMateLang.onChange(syncLanguageControls);
