@@ -454,6 +454,65 @@
     applySettings();
   }
 
+  const DELETE_ACCOUNT_SQL = `create or replace function public.delete_account()
+returns void
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+declare
+  v_user uuid := auth.uid();
+begin
+  if v_user is null then
+    raise exception 'Not signed in.';
+  end if;
+  delete from public.workspaces where user_id = v_user;
+  delete from public.profiles where id = v_user;
+  delete from auth.users where id = v_user;
+end;
+$$;
+
+revoke all on function public.delete_account() from public, anon;
+grant execute on function public.delete_account() to authenticated;`;
+
+  function showDeleteSetup() {
+    if (document.querySelector(".setup-modal")) return;
+    const box = document.createElement("div");
+    box.className = "setup-modal";
+    box.innerHTML = `<div class="setup-card">
+      <h3>Supabase setup needed</h3>
+      <p>Delete account chalane ke liye Supabase me ek chhota function banana padega. Neeche wali SQL copy karke <strong>Supabase → SQL Editor → New query → Run</strong> kar do. Uske baad yahi button kaam karega.</p>
+      <textarea readonly spellcheck="false">${esc(DELETE_ACCOUNT_SQL)}</textarea>
+      <div class="row-actions">
+        <button class="btn primary" type="button" data-copy-setup>Copy SQL</button>
+        <button class="btn ghost" type="button" data-close-setup>Close</button>
+      </div>
+    </div>`;
+    document.body.appendChild(box);
+    const close = () => box.remove();
+    box.addEventListener("click", (event) => {
+      if (event.target === box || event.target.hasAttribute("data-close-setup")) { close(); return; }
+      if (!event.target.hasAttribute("data-copy-setup")) return;
+      const area = box.querySelector("textarea");
+      const fallback = () => {
+        area.focus();
+        area.select();
+        let done = false;
+        try { done = document.execCommand("copy"); } catch (_) {}
+        toast(done ? "SQL copied. Paste it in Supabase SQL Editor." : "Select the SQL and copy it manually.", done ? "ok" : "warn");
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(area.value)
+          .then(() => toast("SQL copied. Paste it in Supabase SQL Editor.", "ok"))
+          .catch(fallback);
+      } else fallback();
+    });
+    const onKey = (event) => {
+      if (event.key === "Escape") { close(); document.removeEventListener("keydown", onKey); }
+    };
+    document.addEventListener("keydown", onKey);
+  }
+
   async function deleteAccount() {
     if (!confirm("Delete your account and ALL cloud data? This cannot be undone.")) return;
     const btn = document.getElementById("deleteAccountBtn");
@@ -470,7 +529,13 @@
       applySettings();
       setAuthStatus("Account and all data deleted.", "ok");
     } catch (err) {
-      toast(err.message || "Could not delete account. Run DELETE-ACCOUNT.sql in Supabase first.", "warn");
+      const message = String((err && err.message) || "");
+      if (/delete_account/i.test(message) && /function/i.test(message)) {
+        showDeleteSetup();
+        toast("Delete function missing in Supabase. SQL ready to copy.", "warn");
+      } else {
+        toast(message || "Could not delete account.", "warn");
+      }
     } finally {
       suppressAuthHandling = false;
       if (btn) btn.disabled = false;
